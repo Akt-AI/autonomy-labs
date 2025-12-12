@@ -2,479 +2,122 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Sandbox Agent Hub</title>
-    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Sandbox</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" rel="stylesheet" />
-    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.5/dist/purify.min.js"></script>
-    <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/tokyo-night-dark.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
-    <style>
-        body {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-        }
-
-        .glass {
-            background: rgba(31, 41, 55, 0.65);
-            backdrop-filter: blur(10px);
-        }
-
-        .gradient-border {
-            border: 1px solid rgba(59, 130, 246, 0.4);
-            box-shadow: 0 0 0 1px rgba(124, 58, 237, 0.2), 0 15px 50px rgba(0, 0, 0, 0.35);
-        }
-
-        .markdown-body {
-            color: #e5e7eb;
-        }
-
-        .markdown-body pre {
-            background: #0f172a;
-            padding: 12px;
-            border-radius: 10px;
-            overflow-x: auto;
-            border: 1px solid rgba(59, 130, 246, 0.2);
-        }
-
-        .markdown-body code {
-            background: rgba(59, 130, 246, 0.15);
-            padding: 0.15rem 0.35rem;
-            border-radius: 6px;
-        }
-
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: #4b5563;
-            border-radius: 999px;
-        }
-
-        .tab-active {
-            background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(124, 58, 237, 0.2));
-            color: #e5e7eb;
-            border: 1px solid rgba(59, 130, 246, 0.5);
-        }
-    </style>
 </head>
 
-<body class="bg-gradient-to-br from-gray-950 via-slate-900 to-gray-950 text-white min-h-screen">
-    <div id="root"></div>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen">
+    <div class="w-full max-w-md p-8 space-y-6 bg-gray-800 rounded-lg shadow-lg">
+        <h1 class="text-3xl font-bold text-center text-blue-500">Sandbox Login</h1>
 
-    <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+        <div id="alert" class="hidden p-4 mb-4 text-sm text-red-500 bg-gray-700 rounded-lg" role="alert"></div>
 
-        const defaultServers = [
-            { name: "n8n-mcp-docs", type: "docs", url: "https://github.com/czlonkowski/n8n-mcp", auth: "none" },
-            { name: "n8n-mcp-api", type: "api", url: "https://n8n.mcp.kapa.ai/", auth: "token" },
-            { name: "filesystem", type: "local", url: "file://workspace", auth: "none" },
-            { name: "gemini", type: "llm", url: "https://generativelanguage.googleapis.com", auth: "apiKey" },
-            { name: "claude", type: "llm", url: "https://api.anthropic.com", auth: "apiKey" },
-            { name: "codex", type: "llm", url: "https://api.openai.com", auth: "apiKey" },
-            { name: "canva", type: "design", url: "https://www.canva.com", auth: "oauth" },
-            { name: "github", type: "git", url: "https://api.github.com", auth: "token" },
-        ];
+        <form id="auth-form" class="space-y-4">
+            <div>
+                <label for="email" class="block mb-2 text-sm font-medium">Email</label>
+                <input type="email" id="email"
+                    class="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    required>
+            </div>
+            <div>
+                <label for="password" class="block mb-2 text-sm font-medium">Password</label>
+                <input type="password" id="password"
+                    class="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    required>
+            </div>
 
-        const initialTheme = {
-            accent: "from-blue-500 via-purple-500 to-pink-500",
-            card: "glass gradient-border",
-            panel: "glass"
-        };
+            <div class="flex space-x-4">
+                <button type="submit" id="login-btn"
+                    class="w-full px-5 py-2.5 text-sm font-medium bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-800">Login</button>
+                <button type="button" id="register-btn"
+                    class="w-full px-5 py-2.5 text-sm font-medium bg-green-600 rounded-lg hover:bg-green-700 focus:ring-4 focus:ring-green-800">Register</button>
+            </div>
+        </form>
+    </div>
 
-        const TabButton = ({ label, active, onClick }) => (
-            <button
-                onClick={onClick}
-                className={"px-4 py-2 rounded-lg text-sm font-medium transition-all border border-transparent hover:border-blue-500/40 " + (active ? "tab-active" : "text-gray-300 bg-gray-800/70")}
-            >
-                {label}
-            </button>
-        );
+    <script>
+        let supabase;
 
-        const Markdown = ({ content }) => {
-            const [html, setHtml] = useState("");
-            useEffect(() => {
-                if (!content) {
-                    setHtml("");
-                    return;
+        async function initSupabase() {
+            try {
+                const res = await fetch('/config');
+                const config = await res.json();
+                if (!config.supabase_url || !config.supabase_key) {
+                    throw new Error('Supabase configuration missing');
                 }
-                marked.setOptions({
-                    highlight: (code, lang) => hljs.highlightAuto(code, [lang]).value,
-                    breaks: true,
-                });
-                const dirty = marked.parse(content);
-                const safe = DOMPurify.sanitize(dirty);
-                setHtml(safe);
-                setTimeout(() => {
-                    document.querySelectorAll(".markdown-body code").forEach(block => hljs.highlightElement(block));
-                    renderMathInElement(document.getElementById("root"), {
-                        delimiters: [
-                            { left: "$$", right: "$$", display: true },
-                            { left: "$", right: "$", display: false },
-                        ],
-                    });
-                }, 50);
-            }, [content]);
-            return <div className="markdown-body prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: html }} />;
-        };
+                supabase = window.supabase.createClient(config.supabase_url, config.supabase_key);
 
-        const TerminalPanel = () => {
-            const termRef = useRef(null);
-            const containerRef = useRef(null);
+                // Check if already logged in
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                    window.location.href = '/static/dashboard.html';
+                }
+            } catch (error) {
+                console.error('Error initializing Supabase:', error);
+                showAlert('Error initializing application configuration', 'error');
+            }
+        }
 
-            useEffect(() => {
-                const term = new window.Terminal({
-                    convertEol: true,
-                    fontSize: 14,
-                    theme: { background: "#0b1224", foreground: "#e5e7eb" },
-                });
-                const fitAddon = new window.FitAddon.FitAddon();
-                term.loadAddon(fitAddon);
-                term.open(containerRef.current);
-                fitAddon.fit();
+        function showAlert(message, type = 'error') {
+            const alert = document.getElementById('alert');
+            alert.textContent = message;
+            alert.classList.remove('hidden');
+            if (type === 'success') {
+                alert.classList.remove('text-red-500');
+                alert.classList.add('text-green-500');
+            } else {
+                alert.classList.remove('text-green-500');
+                alert.classList.add('text-red-500');
+            }
+        }
 
-                const socket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/terminal`);
-                socket.onmessage = (event) => term.write(event.data);
-                term.onData(data => socket.send(data));
+        async function handleAuth(type) {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
 
-                const handleResize = () => {
-                    fitAddon.fit();
-                    const dims = fitAddon.proposeDimensions();
-                    if (dims) {
-                        socket.send(`\x01resize:${dims.cols}:${dims.rows}`);
+            if (!supabase) {
+                showAlert('Supabase not initialized');
+                return;
+            }
+
+            try {
+                let result;
+                if (type === 'login') {
+                    result = await supabase.auth.signInWithPassword({ email, password });
+                } else {
+                    result = await supabase.auth.signUp({ email, password });
+                }
+
+                if (result.error) throw result.error;
+
+                if (type === 'register') {
+                    if (result.data && result.data.session) {
+                        // Email verification is disabled, user is logged in
+                        window.location.href = '/static/dashboard.html';
+                    } else {
+                        showAlert('Registration successful! Please check your email to verify (if enabled) or try logging in.', 'success');
                     }
-                };
-                window.addEventListener("resize", handleResize);
-                setTimeout(handleResize, 150);
-
-                termRef.current = { term, socket, cleanup: () => { window.removeEventListener("resize", handleResize); socket.close(); term.dispose(); } };
-                return () => termRef.current?.cleanup();
-            }, []);
-
-            return <div className="h-full w-full bg-black/60 rounded-xl p-2" ref={containerRef}></div>;
-        };
-
-        const BrowserPanel = () => {
-            const [url, setUrl] = useState("https://example.com");
-            const [src, setSrc] = useState("https://example.com");
-            return (
-                <div className="flex flex-col h-full gap-3">
-                    <div className="flex gap-2">
-                        <input value={url} onChange={e => setUrl(e.target.value)} className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2" placeholder="https://..." />
-                        <button onClick={() => setSrc(url)} className="px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-700">Open</button>
-                    </div>
-                    <iframe className="flex-1 rounded-xl border border-gray-800" src={src} title="Embedded browser"></iframe>
-                </div>
-            );
-        };
-
-        const MCPAdmin = ({ servers, setServers }) => {
-            const [draft, setDraft] = useState({ name: "", type: "", url: "", auth: "none" });
-            const addServer = () => {
-                if (!draft.name || !draft.url) return;
-                const next = [...servers, draft];
-                setServers(next);
-                localStorage.setItem("mcp-servers", JSON.stringify(next));
-                setDraft({ name: "", type: "", url: "", auth: "none" });
-            };
-            return (
-                <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="glass rounded-xl p-4 border border-gray-800">
-                            <h3 className="font-semibold mb-3">Add MCP Server</h3>
-                            <input className="w-full mb-2 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2" placeholder="Name" value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} />
-                            <input className="w-full mb-2 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2" placeholder="Type (api/docs/llm...)" value={draft.type} onChange={e => setDraft({ ...draft, type: e.target.value })} />
-                            <input className="w-full mb-2 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2" placeholder="URL" value={draft.url} onChange={e => setDraft({ ...draft, url: e.target.value })} />
-                            <select className="w-full mb-3 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2" value={draft.auth} onChange={e => setDraft({ ...draft, auth: e.target.value })}>
-                                <option value="none">No auth</option>
-                                <option value="token">Token</option>
-                                <option value="apiKey">API Key</option>
-                                <option value="oauth">OAuth</option>
-                            </select>
-                            <button onClick={addServer} className="w-full py-2 bg-blue-600 rounded-lg hover:bg-blue-700">Save</button>
-                        </div>
-                        <div className="glass rounded-xl p-4 border border-gray-800">
-                            <h3 className="font-semibold mb-3">Default & Saved MCP Servers</h3>
-                            <div className="space-y-2 max-h-72 overflow-auto">
-                                {servers.map((srv, idx) => (
-                                    <div key={idx} className="p-3 rounded-lg border border-gray-700 bg-gray-800/70">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="font-semibold">{srv.name}</span>
-                                            <span className="text-gray-400">{srv.type}</span>
-                                        </div>
-                                        <div className="text-xs text-gray-400 break-all">{srv.url}</div>
-                                        <div className="text-xs text-gray-400">Auth: {srv.auth}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                    <p className="text-sm text-gray-400">Expose this app as an MCP host by pointing your client to these server configs. Default servers include docs, APIs, and LLM backends (n8n, Gemini, Claude, Codex, GitHub, Canva, filesystem).</p>
-                </div>
-            );
-        };
-
-        const AgentPanel = ({ onSend }) => {
-            const [workflowId, setWorkflowId] = useState("");
-            const [baseUrl, setBaseUrl] = useState("");
-            const [apiKey, setApiKey] = useState("");
-            const [payload, setPayload] = useState("{}");
-            const [log, setLog] = useState("");
-
-            const triggerWorkflow = async () => {
-                if (!workflowId || !baseUrl || !apiKey) {
-                    setLog("Missing base URL, API key, or workflow ID.");
-                    return;
+                } else {
+                    window.location.href = '/static/dashboard.html';
                 }
-                try {
-                    const res = await fetch(`${baseUrl.replace(/\/$/, "")}/api/v1/workflows/${workflowId}/run`, {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "X-N8N-API-KEY": apiKey,
-                        },
-                        body: payload,
-                    });
-                    const data = await res.json();
-                    setLog(JSON.stringify(data, null, 2));
-                    onSend && onSend(`@agent n8n triggered workflow ${workflowId}`);
-                } catch (e) {
-                    setLog(`Error triggering workflow: ${e.message}`);
-                }
-            };
+            } catch (error) {
+                showAlert(error.message);
+            }
+        }
 
-            return (
-                <div className="glass rounded-xl p-4 border border-gray-800 space-y-3">
-                    <div className="flex gap-2 flex-wrap">
-                        <input className="flex-1 min-w-[140px] bg-gray-800 border border-gray-700 rounded-lg px-3 py-2" placeholder="n8n Base URL" value={baseUrl} onChange={e => setBaseUrl(e.target.value)} />
-                        <input className="flex-1 min-w-[120px] bg-gray-800 border border-gray-700 rounded-lg px-3 py-2" placeholder="API Key" value={apiKey} onChange={e => setApiKey(e.target.value)} />
-                        <input className="w-40 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2" placeholder="Workflow ID" value={workflowId} onChange={e => setWorkflowId(e.target.value)} />
-                    </div>
-                    <textarea className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2" rows="3" value={payload} onChange={e => setPayload(e.target.value)}></textarea>
-                    <div className="flex gap-2">
-                        <button onClick={triggerWorkflow} className="px-4 py-2 bg-emerald-600 rounded-lg hover:bg-emerald-700">Trigger @agent</button>
-                        <button onClick={() => setLog("")} className="px-3 py-2 bg-gray-700 rounded-lg">Clear</button>
-                    </div>
-                    <pre className="bg-black/50 p-3 rounded-lg text-sm overflow-auto max-h-40">{log || "Ready"}</pre>
-                    <p className="text-xs text-gray-400">Uses X-N8N-API-KEY header for auth. Works with self-hosted n8n or cloud.</p>
-                </div>
-            );
-        };
+        document.getElementById('auth-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            handleAuth('login');
+        });
 
-        const ChatPanel = ({ theme }) => {
-            const [messages, setMessages] = useState([]);
-            const [input, setInput] = useState("");
-            const [model, setModel] = useState("gpt-4o-mini");
-            const [streaming, setStreaming] = useState(false);
-            const [attachments, setAttachments] = useState([]);
-            const [mode, setMode] = useState("chat");
-            const [agentFeedback, setAgentFeedback] = useState("");
+        document.getElementById('register-btn').addEventListener('click', () => {
+            handleAuth('register');
+        });
 
-            const addMessage = (msg) => setMessages(prev => [...prev, msg]);
-
-            const handleFiles = (files) => {
-                const arr = Array.from(files).map(f => ({ name: f.name, size: f.size }));
-                setAttachments([...attachments, ...arr]);
-            };
-
-            const sendMessage = async () => {
-                if (!input.trim()) return;
-                const userMsg = { role: "user", content: input + (attachments.length ? `\nAttachments: ${attachments.map(a => a.name).join(", ")}` : "") };
-                addMessage(userMsg);
-                setInput("");
-                setAttachments([]);
-
-                if (mode === "agent") {
-                    addMessage({ role: "assistant", content: "Autonomous agent received your instructions. Running playbook..." });
-                    return;
-                }
-
-                setStreaming(true);
-                const newMessages = [...messages, userMsg];
-                const responseMsg = { role: "assistant", content: "" };
-                addMessage(responseMsg);
-
-                try {
-                    const res = await fetch("/api/chat", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ messages: newMessages, model }),
-                    });
-                    const reader = res.body.getReader();
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        const chunk = new TextDecoder().decode(value);
-                        responseMsg.content += chunk;
-                        setMessages(prev => prev.map((m, idx) => idx === prev.length - 1 ? responseMsg : m));
-                    }
-                } catch (e) {
-                    responseMsg.content += `\n\nError: ${e.message}`;
-                } finally {
-                    setStreaming(false);
-                }
-            };
-
-            const captureScreenshot = async () => {
-                const node = document.getElementById("chat-feed");
-                if (!node) return;
-                const canvas = await html2canvas(node);
-                const dataUrl = canvas.toDataURL();
-                addMessage({ role: "system", content: `Screenshot captured. Data URI length ${dataUrl.length}` });
-            };
-
-            return (
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-full">
-                    <div className="lg:col-span-3 glass rounded-2xl p-4 border border-gray-800 flex flex-col min-h-[60vh]">
-                        <div className="flex justify-between items-center mb-3">
-                            <h3 className="font-semibold text-lg">AI & Agent Chat</h3>
-                            <div className="flex gap-2">
-                                <select className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1 text-sm" value={model} onChange={e => setModel(e.target.value)}>
-                                    <option>gpt-4o-mini</option>
-                                    <option>gpt-3.5-turbo</option>
-                                    <option>gpt-4o</option>
-                                </select>
-                                <select className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1 text-sm" value={mode} onChange={e => setMode(e.target.value)}>
-                                    <option value="chat">LLM Chat</option>
-                                    <option value="agent">Autonomous Agent</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div id="chat-feed" className="flex-1 overflow-y-auto space-y-3 pr-1">
-                            {messages.map((m, idx) => (
-                                <div key={idx} className={"p-3 rounded-xl " + (m.role === "user" ? "bg-blue-600/40 border border-blue-500/40" : "bg-gray-800/70 border border-gray-700")}>
-                                    <div className="text-xs uppercase tracking-wide text-gray-300 mb-1">{m.role}</div>
-                                    <Markdown content={m.content} />
-                                </div>
-                            ))}
-                        </div>
-                        <div className="mt-3 space-y-2">
-                            <div className="flex gap-2 flex-wrap">
-                                <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendMessage())} placeholder="Message or @agent instruction..." className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2" />
-                                <button onClick={sendMessage} className="px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50" disabled={streaming}>{streaming ? "Streaming..." : "Send"}</button>
-                                <label className="px-3 py-2 bg-gray-700 rounded-lg cursor-pointer">
-                                    <input type="file" multiple className="hidden" onChange={e => handleFiles(e.target.files)} />
-                                    Attach
-                                </label>
-                                <button onClick={captureScreenshot} className="px-3 py-2 bg-indigo-600 rounded-lg hover:bg-indigo-700">Capture</button>
-                            </div>
-                            {attachments.length > 0 && (
-                                <div className="flex gap-2 flex-wrap text-xs text-gray-300">
-                                    {attachments.map((a, idx) => <span key={idx} className="px-2 py-1 bg-gray-700 rounded-lg">{a.name}</span>)}
-                                </div>
-                            )}
-                            <textarea className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm" rows="2" placeholder="Agent feedback for autonomous runs..." value={agentFeedback} onChange={e => setAgentFeedback(e.target.value)}></textarea>
-                        </div>
-                    </div>
-                    <div className="lg:col-span-2 space-y-4">
-                        <AgentPanel onSend={msg => addMessage({ role: "system", content: msg })} />
-                        <div className="glass rounded-2xl p-4 border border-gray-800">
-                            <h3 className="font-semibold mb-2">Multimodal Inputs</h3>
-                            <ul className="text-sm text-gray-300 space-y-1 list-disc list-inside">
-                                <li>Attach files (prepended to chat for LLM context).</li>
-                                <li>Paste images directly into the input to describe visuals.</li>
-                                <li>Use screenshot capture to send UI context to agents.</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        const AgentModePanel = () => {
-            return (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 h-full">
-                    <div className="glass rounded-2xl p-4 border border-gray-800 flex flex-col min-h-[70vh]">
-                        <h3 className="font-semibold mb-2">Chat</h3>
-                        <ChatPanel />
-                    </div>
-                    <div className="space-y-4">
-                        <div className="glass rounded-2xl p-4 border border-gray-800 h-[45vh]">
-                            <h3 className="font-semibold mb-2">Terminal (Agent run)</h3>
-                            <TerminalPanel />
-                        </div>
-                        <div className="glass rounded-2xl p-4 border border-gray-800 h-[30vh]">
-                            <h3 className="font-semibold mb-2">Browser (Agent run)</h3>
-                            <BrowserPanel />
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        const App = () => {
-            const [tab, setTab] = useState("chat");
-            const [servers, setServers] = useState(() => {
-                const saved = localStorage.getItem("mcp-servers");
-                return saved ? JSON.parse(saved) : defaultServers;
-            });
-
-            useEffect(() => {
-                localStorage.setItem("mcp-servers", JSON.stringify(servers));
-            }, [servers]);
-
-            const tabs = [
-                { id: "chat", label: "AI Chat" },
-                { id: "terminal", label: "Terminal" },
-                { id: "browser", label: "Web Browser" },
-                { id: "agent", label: "Autonomous Mode" },
-                { id: "mcp", label: "MCP Admin" },
-            ];
-
-            return (
-                <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-                    <header className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div>
-                            <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500">Sandbox Agent Hub</h1>
-                            <p className="text-gray-400">React-powered control center for chat, terminal, browser, n8n @agent triggers, MCP hosting, and autonomous runs.</p>
-                        </div>
-                        <div className="flex gap-2 flex-wrap">
-                            {tabs.map(t => <TabButton key={t.id} label={t.label} active={tab === t.id} onClick={() => setTab(t.id)} />)}
-                        </div>
-                    </header>
-
-                    {tab === "chat" && <ChatPanel theme={initialTheme} />}
-                    {tab === "terminal" && (
-                        <div className="glass rounded-2xl p-4 border border-gray-800 min-h-[70vh]">
-                            <div className="flex justify-between mb-2">
-                                <h3 className="font-semibold">Terminal</h3>
-                                <span className="text-xs text-gray-400">vim/git/codex/gemini-cli/claude-cli available in container</span>
-                            </div>
-                            <TerminalPanel />
-                        </div>
-                    )}
-                    {tab === "browser" && (
-                        <div className="glass rounded-2xl p-4 border border-gray-800 min-h-[70vh]">
-                            <h3 className="font-semibold mb-3">Embedded Browser</h3>
-                            <BrowserPanel />
-                        </div>
-                    )}
-                    {tab === "agent" && <AgentModePanel />}
-                    {tab === "mcp" && (
-                        <div className="glass rounded-2xl p-4 border border-gray-800">
-                            <h3 className="font-semibold mb-3">MCP Host Admin</h3>
-                            <MCPAdmin servers={servers} setServers={setServers} />
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+        initSupabase();
     </script>
 </body>
 
