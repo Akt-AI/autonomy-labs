@@ -101,6 +101,34 @@
             font-family: "Ubuntu Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
         }
 
+        /* Terminal chrome (borders + subtle depth) */
+        #terminals-container > div,
+        #agent-terminals-container > div {
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+            background: #300a24;
+        }
+
+        /* Make the xterm area blend with the chrome */
+        #terminals-container .xterm,
+        #agent-terminals-container .xterm {
+            padding: 10px;
+        }
+
+        /* Nicer scrollbars inside terminals */
+        #terminals-container .xterm-viewport::-webkit-scrollbar,
+        #agent-terminals-container .xterm-viewport::-webkit-scrollbar {
+            width: 10px;
+        }
+        #terminals-container .xterm-viewport::-webkit-scrollbar-thumb,
+        #agent-terminals-container .xterm-viewport::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.25);
+            border-radius: 10px;
+            border: 2px solid rgba(0, 0, 0, 0);
+            background-clip: padding-box;
+        }
+
         /* Resizable terminal viewport wrapper */
         .terminal-resizable {
             resize: both;
