@@ -408,6 +408,11 @@
                             <button id="chat-mode-auto" onclick="setChatMode('autonomous')"
                                 class="px-2 py-1 text-xs rounded-md text-gray-200 hover:bg-white/10 transition">Autonomous</button>
                         </div>
+                        <button id="chat-terminal-toggle" onclick="toggleAgentTerminalCollapsed()"
+                            class="hidden md:inline-flex px-2 py-1 text-xs rounded-md text-gray-200 hover:bg-white/10 transition"
+                            title="Toggle autonomous terminal">
+                            Terminal
+                        </button>
                         <button onclick="toggleSettings()"
                             class="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-700 transition">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -549,17 +554,6 @@
 
                 <!-- Autonomous mode embedded in Chat view -->
                 <div id="chat-autonomous" class="hidden flex-grow min-h-0">
-                    <div class="agent-toolbar">
-                        <div class="flex items-center gap-2 min-w-0">
-                            <div class="font-semibold text-gray-200">Autonomous</div>
-                            <div class="hint truncate">Use “Run” on code blocks to execute.</div>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <button onclick="toggleAgentTerminalCollapsed()"
-                                class="px-2 py-1 text-xs rounded-md text-gray-200 hover:bg-white/10 transition"
-                                title="Toggle terminal pane">Terminal</button>
-                        </div>
-                    </div>
                     <div id="agent-split-root" class="split-root">
                         <div id="agent-pane-chat" class="split-pane min-h-0 flex flex-col border-r border-gray-700 agent-pane-surface">
                             <div class="flex-grow min-h-0 overflow-hidden">
@@ -569,28 +563,28 @@
                                 <div id="agent-attachments" class="mb-2 hidden"></div>
                                 <div class="flex space-x-2 items-end">
                                     <textarea id="agent-chat-input" rows="1"
-                                        class="flex-grow bg-gray-700 p-3 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-32"
+                                        class="flex-grow bg-gray-700 px-3 py-2 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-28"
                                         placeholder="Ask agent..."
                                         oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
                                         onkeydown="handleAgentEnter(event)"></textarea>
                                     <input id="agent-file-input" type="file" accept="image/*" multiple class="hidden" />
                                     <button onclick="document.getElementById('agent-file-input').click()"
-                                        class="bg-gray-700 px-3 py-3 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
+                                        class="bg-gray-700 px-3 py-2 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
                                         title="Attach images">
                                         📎
                                     </button>
                                     <button onclick="captureScreenshotToAgent()"
-                                        class="bg-gray-700 px-3 py-3 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
+                                        class="bg-gray-700 px-3 py-2 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
                                         title="Take screenshot">
                                         ⧉
                                     </button>
                                     <button id="agent-stop-btn" onclick="stopAgentGeneration()" disabled
-                                        class="bg-gray-600 px-3 rounded-lg hover:bg-gray-700 font-bold transition flex items-center disabled:opacity-40 disabled:cursor-not-allowed"
+                                        class="bg-gray-600 px-3 py-2 rounded-lg hover:bg-gray-700 font-bold transition flex items-center disabled:opacity-40 disabled:cursor-not-allowed"
                                         title="Stop generating">
                                         Stop
                                     </button>
                                     <button onclick="sendAgentMessage()"
-                                        class="bg-blue-600 px-4 rounded-lg hover:bg-blue-700 font-bold transition flex items-center">
+                                        class="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 font-bold transition flex items-center">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
@@ -1015,7 +1009,7 @@
 
             const termDiv = document.createElement('div');
             termDiv.id = containerId;
-            termDiv.className = "absolute inset-0 terminal-resizable";
+            termDiv.className = scope === 'agent' ? "absolute inset-0" : "absolute inset-0 terminal-resizable";
             termDiv.style.display = 'none';
             containersEl.appendChild(termDiv);
 
@@ -1232,6 +1226,7 @@
             const auto = document.getElementById('chat-autonomous');
             const btnChat = document.getElementById('chat-mode-chat');
             const btnAuto = document.getElementById('chat-mode-auto');
+            const terminalToggle = document.getElementById('chat-terminal-toggle');
             if (!standard || !auto) return;
             const m = mode === 'autonomous' ? 'autonomous' : 'chat';
 
@@ -1239,6 +1234,7 @@
             auto.classList.toggle('hidden', m !== 'autonomous');
             if (btnChat) btnChat.classList.toggle('bg-white/10', m === 'chat');
             if (btnAuto) btnAuto.classList.toggle('bg-white/10', m === 'autonomous');
+            if (terminalToggle) terminalToggle.classList.toggle('hidden', m !== 'autonomous');
 
             localStorage.setItem('chat_mode_v1', m);
             if (m === 'autonomous') {
