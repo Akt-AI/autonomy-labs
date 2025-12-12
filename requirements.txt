@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+huggingface_hub
+python-multipart
+python-dotenv
+openai
+websockets
+httpx
