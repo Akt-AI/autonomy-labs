@@ -112,6 +112,54 @@
             position: relative;
         }
 
+        /* Agent split panes (chat | terminal) */
+        .split-root {
+            display: flex;
+            flex: 1 1 auto;
+            min-height: 0;
+            min-width: 0;
+        }
+
+        .split-pane {
+            min-width: 0;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .split-divider {
+            width: 10px;
+            cursor: col-resize;
+            background: linear-gradient(to bottom, rgba(148, 163, 184, 0.15), rgba(148, 163, 184, 0.05));
+            border-left: 1px solid rgba(148, 163, 184, 0.15);
+            border-right: 1px solid rgba(148, 163, 184, 0.15);
+            flex: 0 0 auto;
+            user-select: none;
+            touch-action: none;
+        }
+
+        .split-divider::after {
+            content: "";
+            position: absolute;
+            width: 4px;
+            height: 42px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 6px;
+            background: rgba(148, 163, 184, 0.25);
+        }
+
+        .split-divider {
+            position: relative;
+        }
+
+        .agent-terminal-chrome {
+            background: radial-gradient(1200px 600px at 20% 0%, rgba(114, 159, 207, 0.18), transparent 60%),
+                        radial-gradient(1000px 500px at 80% 100%, rgba(173, 127, 168, 0.12), transparent 55%),
+                        #0b1220;
+        }
+
         .chat-message {
             max-width: 80%;
             padding: 10px;
@@ -369,8 +417,8 @@
                 <div class="font-semibold">Autonomous Mode</div>
                 <div class="text-xs text-gray-300">Use “Run in Terminal” on code blocks.</div>
             </div>
-            <div class="flex-grow grid grid-cols-1 lg:grid-cols-2 min-h-0">
-                <div class="min-h-0 flex flex-col border-r border-gray-700">
+            <div id="agent-split-root" class="split-root">
+                <div id="agent-pane-chat" class="split-pane min-h-0 flex flex-col border-r border-gray-700">
                     <div class="flex-grow min-h-0 overflow-hidden">
                         <div id="agent-chat-history" class="h-full p-4 overflow-y-auto space-y-4"></div>
                     </div>
@@ -396,11 +444,12 @@
                         </div>
                     </div>
                 </div>
-                <div class="min-h-0 bg-black flex flex-col">
-                    <div class="shrink-0 flex items-center bg-gray-800 border-b border-gray-700 overflow-x-auto">
+                <div id="agent-split-divider" class="split-divider" title="Drag to resize panes"></div>
+                <div id="agent-pane-terminal" class="split-pane min-h-0 agent-terminal-chrome flex flex-col">
+                    <div class="shrink-0 flex items-center bg-gray-900/60 border-b border-gray-700 overflow-x-auto">
                         <div id="agent-terminal-tabs" class="flex"></div>
                         <button onclick="createTerminalTab({ scope: 'agent' })"
-                            class="px-3 py-2 text-gray-400 hover:text-white hover:bg-gray-700 transition font-bold"
+                            class="px-3 py-2 text-gray-300 hover:text-white hover:bg-white/10 transition font-bold"
                             title="New Terminal">+</button>
                     </div>
                     <div id="agent-terminals-container" class="flex-grow relative w-full h-full"></div>
@@ -587,6 +636,7 @@
                 });
 
                 initProviderPresets();
+                initAgentSplitPane();
                 // Apply defaults if fields are empty
                 if (config.default_base_url && !document.getElementById('chat-base-url').value) {
                     document.getElementById('chat-base-url').value = config.default_base_url;
@@ -633,7 +683,7 @@
 
             const tabBtn = document.createElement('button');
             tabBtn.id = `tab-btn-${id}`;
-            tabBtn.className = "px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 border-r border-gray-700 flex items-center gap-2";
+            tabBtn.className = "px-3 py-2 text-sm text-gray-200 hover:bg-white/10 border-r border-gray-700/70 flex items-center gap-2";
             tabBtn.innerHTML = `<span>Term ${terminalCount}</span><span class="text-gray-500 hover:text-red-400" title="Close">×</span>`;
             tabBtn.onclick = () => activateTerminalTab(id);
             tabBtn.querySelector('span:last-child').onclick = (e) => closeTerminalTab(id, e);
@@ -764,6 +814,60 @@
                     if (ws.readyState === WebSocket.OPEN) ws.send(`\x01resize:${cols}:${rows}`);
                 } catch (e) { console.log("Fit error:", e); }
             }
+        }
+
+        function initAgentSplitPane() {
+            const root = document.getElementById('agent-split-root');
+            const paneChat = document.getElementById('agent-pane-chat');
+            const paneTerminal = document.getElementById('agent-pane-terminal');
+            const divider = document.getElementById('agent-split-divider');
+            if (!root || !paneChat || !paneTerminal || !divider) return;
+
+            const key = 'agent_split_ratio_v1';
+            const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+            const applyRatio = (ratio) => {
+                const r = clamp(ratio, 0.2, 0.8);
+                paneChat.style.flex = `0 0 ${Math.round(r * 1000) / 10}%`;
+                paneTerminal.style.flex = '1 1 auto';
+                // Refit visible terminals (agent + main)
+                if (activeAgentTerminalId && !document.getElementById('agent-view').classList.contains('hidden')) {
+                    setTimeout(() => fitTerm(activeAgentTerminalId), 0);
+                }
+            };
+
+            const saved = Number(localStorage.getItem(key));
+            if (Number.isFinite(saved) && saved > 0) applyRatio(saved);
+            else applyRatio(0.48);
+
+            let dragging = false;
+            const onMove = (clientX) => {
+                const rect = root.getBoundingClientRect();
+                const ratio = (clientX - rect.left) / rect.width;
+                applyRatio(ratio);
+                localStorage.setItem(key, String(clamp(ratio, 0.2, 0.8)));
+            };
+
+            divider.addEventListener('pointerdown', (e) => {
+                dragging = true;
+                divider.setPointerCapture(e.pointerId);
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+            });
+            divider.addEventListener('pointermove', (e) => {
+                if (!dragging) return;
+                onMove(e.clientX);
+            });
+            divider.addEventListener('pointerup', () => {
+                dragging = false;
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            });
+
+            // Keep split sane on window resize
+            window.addEventListener('resize', () => {
+                const current = Number(localStorage.getItem(key));
+                if (Number.isFinite(current) && current > 0) applyRatio(current);
+            });
         }
 
         window.addEventListener('resize', () => {
