@@ -953,11 +953,51 @@
             list.innerHTML = '';
             if (data && data.length > 0) {
                 data.forEach(session => {
-                    const btn = document.createElement('button');
-                    btn.className = "w-full text-left p-2 hover:bg-gray-700 rounded text-gray-300 text-sm truncate relative group mb-1";
-                    btn.innerHTML = `<span onclick="loadChatSession('${session.id}', '${session.title.replace(/'/g, "\\'")}')">${session.title || 'Untitled'}</span>`;
-                    list.appendChild(btn);
+                    const row = document.createElement('div');
+                    row.className = "w-full flex items-center gap-2 p-2 hover:bg-gray-700 rounded text-gray-300 text-sm group mb-1";
+
+                    const titleBtn = document.createElement('button');
+                    titleBtn.type = 'button';
+                    titleBtn.className = "flex-grow text-left truncate";
+                    titleBtn.textContent = session.title || 'Untitled';
+                    titleBtn.onclick = () => loadChatSession(session.id, session.title || 'Untitled');
+
+                    const delBtn = document.createElement('button');
+                    delBtn.type = 'button';
+                    delBtn.className = "shrink-0 opacity-0 group-hover:opacity-100 transition text-gray-400 hover:text-red-300";
+                    delBtn.title = "Delete chat";
+                    delBtn.onclick = (e) => { e.stopPropagation(); deleteChatSession(session.id); };
+                    delBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4">
+                            <path fill-rule="evenodd" d="M9 3.75A2.25 2.25 0 0 1 11.25 1.5h1.5A2.25 2.25 0 0 1 15 3.75V4.5h4.5a.75.75 0 0 1 0 1.5h-.75l-1.02 14.28A2.25 2.25 0 0 1 15.486 22.5H8.514a2.25 2.25 0 0 1-2.244-2.22L5.25 6h-.75a.75.75 0 0 1 0-1.5H9V3.75Zm1.5.75V3.75a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 .75.75V4.5h-3ZM8.04 6l.75 13.5a.75.75 0 0 0 .75.75h4.92a.75.75 0 0 0 .75-.75L15.96 6H8.04ZM10.5 9a.75.75 0 0 1 .75.75v7.5a.75.75 0 0 1-1.5 0v-7.5A.75.75 0 0 1 10.5 9Zm3 0a.75.75 0 0 1 .75.75v7.5a.75.75 0 0 1-1.5 0v-7.5A.75.75 0 0 1 13.5 9Z" clip-rule="evenodd" />
+                        </svg>`;
+
+                    row.appendChild(titleBtn);
+                    row.appendChild(delBtn);
+                    list.appendChild(row);
                 });
+            }
+        }
+
+        async function deleteChatSession(sessionId) {
+            if (!sessionId) return;
+            if (!confirm("Delete this chat? This cannot be undone.")) return;
+
+            try {
+                // Delete messages first (if FK constraints exist)
+                const { error: msgErr } = await supabase.from('chat_messages').delete().eq('session_id', sessionId);
+                if (msgErr) throw msgErr;
+
+                const { error: sessErr } = await supabase.from('chat_sessions').delete().eq('id', sessionId);
+                if (sessErr) throw sessErr;
+
+                if (currentSessionId === sessionId) {
+                    await startNewChat();
+                }
+                await loadChatHistoryList();
+            } catch (e) {
+                console.error(e);
+                alert(`Failed to delete chat: ${e?.message || e}`);
             }
         }
 
