@@ -33,7 +33,10 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 async def get_config():
     return {
         "supabase_url": os.environ.get("SUPABASE_URL", "https://znhglkwefxdhgajvrqmb.supabase.co"),
-        "supabase_key": os.environ.get("SUPABASE_KEY")
+        "supabase_key": os.environ.get("SUPABASE_KEY"),
+        "default_base_url": os.environ.get("DEFAULT_BASE_URL", "https://router.huggingface.co/v1"),
+        "default_api_key": os.environ.get("DEFAULT_API_KEY", ""),
+        "default_model": os.environ.get("DEFAULT_MODEL", "gpt-3.5-turbo"),
     }
 
 @app.get("/")

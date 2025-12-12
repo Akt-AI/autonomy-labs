@@ -247,6 +247,17 @@
                             </div>
                         </div>
                         <div>
+                            <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Provider Preset</label>
+                            <div class="flex gap-2">
+                                <select id="provider-presets" onchange="applyProviderPreset(this.value)"
+                                    class="flex-grow bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500">
+                                    <option value="">Select preset...</option>
+                                </select>
+                                <button onclick="applyProviderPreset(document.getElementById('provider-presets').value)"
+                                    class="bg-gray-600 hover:bg-gray-700 text-white px-2 rounded text-xs">Apply</button>
+                            </div>
+                        </div>
+                        <div>
                             <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">API Key</label>
                             <input type="password" id="chat-api-key" placeholder="sk-..."
                                 class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500">
@@ -548,6 +559,18 @@
                     await supabase.auth.signOut();
                     window.location.href = '/';
                 });
+
+                initProviderPresets();
+                // Apply defaults if fields are empty
+                if (config.default_base_url && !document.getElementById('chat-base-url').value) {
+                    document.getElementById('chat-base-url').value = config.default_base_url;
+                }
+                if (config.default_api_key && !document.getElementById('chat-api-key').value) {
+                    document.getElementById('chat-api-key').value = config.default_api_key;
+                }
+                if (config.default_model && !document.getElementById('chat-model').value) {
+                    document.getElementById('chat-model').value = config.default_model;
+                }
 
                 loadProviders();
                 await loadChatHistoryList();
@@ -1036,11 +1059,51 @@
             } catch (e) { alert(e.message); }
         }
 
-        function loadProviders() {
+        const STANDARD_PROVIDERS = [
+            { key: 'huggingface-router', name: 'HuggingFace Router', baseUrl: 'https://router.huggingface.co/v1' },
+            { key: 'openai', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' },
+            { key: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1' },
+            { key: 'groq', name: 'Groq (OpenAI-compatible)', baseUrl: 'https://api.groq.com/openai/v1' },
+            { key: 'together', name: 'Together', baseUrl: 'https://api.together.xyz/v1' },
+            { key: 'fireworks', name: 'Fireworks', baseUrl: 'https://api.fireworks.ai/inference/v1' },
+            { key: 'mistral', name: 'Mistral', baseUrl: 'https://api.mistral.ai/v1' },
+            { key: 'deepseek', name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1' },
+        ];
+
+        let providerCache = {}; // name -> { apiKey, baseUrl, model }
+        let warnedProviderFallback = false;
+
+        function initProviderPresets() {
+            const presets = document.getElementById('provider-presets');
+            if (!presets) return;
+            presets.innerHTML = '<option value="">Select preset...</option>';
+            STANDARD_PROVIDERS.forEach((p) => {
+                const opt = document.createElement('option');
+                opt.value = p.key;
+                opt.innerText = `${p.name} — ${p.baseUrl}`;
+                presets.appendChild(opt);
+            });
+        }
+
+        function applyProviderPreset(key) {
+            if (!key) return;
+            const preset = STANDARD_PROVIDERS.find((p) => p.key === key);
+            if (!preset) return;
+            document.getElementById('chat-base-url').value = preset.baseUrl;
+        }
+
+        async function getActiveUserId() {
+            const { data, error } = await supabase.auth.getUser();
+            if (error) throw error;
+            return data?.user?.id || null;
+        }
+
+        function loadProvidersFromLocalStorage() {
             const select = document.getElementById('saved-providers');
             const saved = JSON.parse(localStorage.getItem('chat_providers') || '{}');
+            providerCache = saved;
             select.innerHTML = '<option value="">Select...</option>';
-            Object.keys(saved).forEach(k => {
+            Object.keys(saved).forEach((k) => {
                 const opt = document.createElement('option');
                 opt.value = k;
                 opt.innerText = k;
@@ -1048,39 +1111,104 @@
             });
         }
 
-        function saveProvider() {
+        async function loadProviders() {
+            try {
+                const uid = await getActiveUserId();
+                if (!uid) return loadProvidersFromLocalStorage();
+
+                const { data, error } = await supabase
+                    .from('provider_configs')
+                    .select('name, api_key, base_url, model')
+                    .eq('user_id', uid)
+                    .order('name', { ascending: true });
+                if (error) throw error;
+
+                providerCache = {};
+                (data || []).forEach((row) => {
+                    providerCache[row.name] = { apiKey: row.api_key || '', baseUrl: row.base_url || '', model: row.model || '' };
+                });
+
+                const select = document.getElementById('saved-providers');
+                select.innerHTML = '<option value="">Select...</option>';
+                Object.keys(providerCache).forEach((k) => {
+                    const opt = document.createElement('option');
+                    opt.value = k;
+                    opt.innerText = k;
+                    select.appendChild(opt);
+                });
+            } catch (e) {
+                if (!warnedProviderFallback) {
+                    warnedProviderFallback = true;
+                    console.warn('Provider configs table missing or RLS blocked; falling back to localStorage.', e);
+                }
+                loadProvidersFromLocalStorage();
+            }
+        }
+
+        async function saveProvider() {
             const name = prompt("Name:");
             if (!name) return;
+
             const config = {
                 apiKey: document.getElementById('chat-api-key').value,
                 baseUrl: document.getElementById('chat-base-url').value,
                 model: document.getElementById('chat-model').value
             };
-            const saved = JSON.parse(localStorage.getItem('chat_providers') || '{}');
-            saved[name] = config;
-            localStorage.setItem('chat_providers', JSON.stringify(saved));
-            loadProviders();
-            document.getElementById('saved-providers').value = name;
+
+            try {
+                const uid = await getActiveUserId();
+                if (!uid) throw new Error('No active user session');
+
+                const { error } = await supabase
+                    .from('provider_configs')
+                    .upsert(
+                        { user_id: uid, name, api_key: config.apiKey, base_url: config.baseUrl, model: config.model },
+                        { onConflict: 'user_id,name' }
+                    );
+                if (error) throw error;
+                await loadProviders();
+                document.getElementById('saved-providers').value = name;
+            } catch (e) {
+                // Fallback to local storage if table isn't available.
+                const saved = JSON.parse(localStorage.getItem('chat_providers') || '{}');
+                saved[name] = config;
+                localStorage.setItem('chat_providers', JSON.stringify(saved));
+                loadProvidersFromLocalStorage();
+                document.getElementById('saved-providers').value = name;
+            }
         }
 
-        function deleteProvider() {
+        async function deleteProvider() {
             const name = document.getElementById('saved-providers').value;
             if (!name) return;
             if (!confirm("Delete?")) return;
-            const saved = JSON.parse(localStorage.getItem('chat_providers') || '{}');
-            delete saved[name];
-            localStorage.setItem('chat_providers', JSON.stringify(saved));
-            loadProviders();
+
+            try {
+                const uid = await getActiveUserId();
+                if (!uid) throw new Error('No active user session');
+
+                const { error } = await supabase
+                    .from('provider_configs')
+                    .delete()
+                    .eq('user_id', uid)
+                    .eq('name', name);
+                if (error) throw error;
+                await loadProviders();
+            } catch (e) {
+                const saved = JSON.parse(localStorage.getItem('chat_providers') || '{}');
+                delete saved[name];
+                localStorage.setItem('chat_providers', JSON.stringify(saved));
+                loadProvidersFromLocalStorage();
+            }
         }
 
         function loadSelectedProvider(name) {
             if (!name) return;
-            const saved = JSON.parse(localStorage.getItem('chat_providers') || '{}');
-            const config = saved[name];
+            const config = providerCache[name];
             if (config) {
-                document.getElementById('chat-api-key').value = config.apiKey;
-                document.getElementById('chat-base-url').value = config.baseUrl;
-                document.getElementById('chat-model').value = config.model;
+                document.getElementById('chat-api-key').value = config.apiKey || '';
+                document.getElementById('chat-base-url').value = config.baseUrl || '';
+                document.getElementById('chat-model').value = config.model || '';
             }
         }
 
