@@ -169,15 +169,17 @@
         }
 
         .user-message {
-            background-color: #3b82f6;
+            background-color: rgba(96, 165, 250, 0.22);
+            border: 1px solid rgba(96, 165, 250, 0.35);
             align-self: flex-end;
-            color: white;
+            color: #e6f0ff;
         }
 
         .ai-message {
-            background-color: #374151;
+            background-color: rgba(148, 163, 184, 0.12);
+            border: 1px solid rgba(148, 163, 184, 0.22);
             align-self: flex-start;
-            color: white;
+            color: #f1f5f9;
         }
     </style>
 </head>
@@ -207,8 +209,14 @@
                     class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition"
                     id="nav-terminal">Terminal</button>
             </div>
-            <button id="logout-btn"
-                class="px-3 py-1 bg-red-600 rounded hover:bg-red-700 text-sm font-medium transition">Logout</button>
+            <div class="flex items-center gap-3 min-w-0">
+                <div id="user-badge" class="hidden md:flex flex-col items-end leading-tight min-w-0">
+                    <div id="user-name" class="text-sm text-gray-200 font-medium truncate max-w-[20rem]"></div>
+                    <div id="user-email" class="text-xs text-gray-400 truncate max-w-[20rem]"></div>
+                </div>
+                <button id="logout-btn"
+                    class="px-3 py-1 bg-red-600 rounded hover:bg-red-700 text-sm font-medium transition">Logout</button>
+            </div>
         </div>
         <!-- Mobile Menu -->
         <div id="mobile-menu" class="hidden md:hidden bg-gray-800 border-t border-gray-700 p-2 space-y-1">
@@ -630,6 +638,29 @@
                 const { data: { session } } = await supabase.auth.getSession();
                 if (!session) { window.location.href = '/'; return; }
 
+                // Logged-in user badge (email + username)
+                try {
+                    const { data: userData } = await supabase.auth.getUser();
+                    const user = userData?.user;
+                    if (user) {
+                        const username =
+                            user.user_metadata?.username ||
+                            user.user_metadata?.name ||
+                            user.user_metadata?.full_name ||
+                            (user.email ? user.email.split('@')[0] : '') ||
+                            (user.id ? `user-${String(user.id).slice(0, 8)}` : 'User');
+                        const email = user.email || '';
+                        const badge = document.getElementById('user-badge');
+                        const nameEl = document.getElementById('user-name');
+                        const emailEl = document.getElementById('user-email');
+                        if (badge) badge.classList.remove('hidden');
+                        if (nameEl) nameEl.textContent = username;
+                        if (emailEl) emailEl.textContent = email;
+                    }
+                } catch (e) {
+                    console.warn('User badge load failed', e);
+                }
+
                 document.getElementById('logout-btn').addEventListener('click', async () => {
                     await supabase.auth.signOut();
                     window.location.href = '/';
@@ -1018,7 +1049,7 @@
 
         function addMessageToUI(role, content) {
             const div = document.createElement('div');
-            div.className = `chat-message ${role === 'user' ? 'user-message bg-blue-600 self-end' : 'ai-message bg-gray-700 self-start'} max-w-[85%] p-3 rounded-xl my-2 prose prose-invert break-words text-sm md:text-base shadow-sm`;
+            div.className = `chat-message ${role === 'user' ? 'user-message self-end' : 'ai-message self-start'} max-w-[85%] p-3 rounded-xl my-2 prose prose-invert break-words text-sm md:text-base shadow-sm`;
             renderMarkdownInto(div, content);
             document.getElementById('chat-history').appendChild(div);
             return div;
@@ -1100,7 +1131,7 @@
 
         function addAgentMessageToUI(role, content) {
             const div = document.createElement('div');
-            div.className = `chat-message ${role === 'user' ? 'user-message bg-blue-600 self-end' : 'ai-message bg-gray-700 self-start'} max-w-[85%] p-3 rounded-xl my-2 prose prose-invert break-words text-sm md:text-base shadow-sm`;
+            div.className = `chat-message ${role === 'user' ? 'user-message self-end' : 'ai-message self-start'} max-w-[85%] p-3 rounded-xl my-2 prose prose-invert break-words text-sm md:text-base shadow-sm`;
             renderMarkdownInto(div, content);
             document.getElementById('agent-chat-history').appendChild(div);
             return div;
