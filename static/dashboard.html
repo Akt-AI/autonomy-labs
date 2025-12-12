@@ -479,6 +479,31 @@
                                 </div>
                             </div>
                         </div>
+
+                        <div class="pt-4 border-t border-gray-700">
+                            <div class="flex items-center justify-between gap-2 mb-2">
+                                <div class="font-semibold text-gray-200">MCP</div>
+                                <button onclick="addMcpServerPrompt()"
+                                    class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs">+ Add</button>
+                            </div>
+                            <div class="text-xs text-gray-400 mb-2">
+                                Configure MCP servers (URLs + auth). Stored in <code>localStorage</code>. Import/export via <code>mcp.json</code>.
+                            </div>
+                            <div class="flex gap-2 mb-3">
+                                <button onclick="exportMcpConfig()"
+                                    class="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs">Export</button>
+                                <input id="mcp-import-input" type="file" accept="application/json" class="hidden" />
+                                <button onclick="document.getElementById('mcp-import-input').click()"
+                                    class="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs">Import</button>
+                            </div>
+                            <div class="flex gap-2 mb-3">
+                                <input id="mcp-direct-url" type="text" placeholder="Direct MCP URL (https://...)"
+                                    class="flex-grow bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500">
+                                <button onclick="addMcpServerByUrl()"
+                                    class="bg-gray-700 hover:bg-gray-600 text-white px-2 rounded text-xs">Add</button>
+                            </div>
+                            <div id="settings-mcp-server-list" class="space-y-3"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -786,8 +811,20 @@
             }
             const id = preferScope === 'agent' ? activeAgentTerminalId : activeTerminalId;
             const t = terminals[id];
-            if (autoShow) switchMode(preferScope === 'agent' ? 'agent' : 'terminal');
+            if (autoShow) {
+                if (preferScope === 'agent') {
+                    openAutonomousMode();
+                    ensureAgentTerminalVisible();
+                } else {
+                    switchMode('terminal');
+                }
+            }
             if (t && t.ws && t.ws.readyState === WebSocket.OPEN) t.ws.send(data);
+        }
+
+        function ensureAgentTerminalVisible() {
+            const paneTerminal = document.getElementById('agent-pane-terminal');
+            if (paneTerminal && paneTerminal.classList.contains('hidden')) toggleAgentTerminalCollapsed();
         }
 
         function openSettings() {
@@ -905,6 +942,22 @@
                         if (files.length) {
                             addAttachmentsFromFiles(files, 'agent');
                             e.preventDefault();
+                        }
+                    });
+                }
+
+                // MCP import
+                const mcpImport = document.getElementById('mcp-import-input');
+                if (mcpImport) {
+                    mcpImport.addEventListener('change', async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        try {
+                            await importMcpConfigFromFile(file);
+                        } catch (err) {
+                            alert(`Failed to import mcp.json: ${err?.message || err}`);
+                        } finally {
+                            mcpImport.value = '';
                         }
                     });
                 }
@@ -1200,6 +1253,7 @@
         function openAutonomousMode() {
             switchMode('chat');
             setChatMode('autonomous');
+            ensureAgentTerminalVisible();
         }
 
         window.addEventListener('resize', () => {
@@ -1667,9 +1721,69 @@
                 url,
                 apiKey: '',
                 token: '',
-                headersJson: '{}'
+                headersJson: '{}',
+                toolsJson: '[]'
             });
             saveMcpServers(servers);
+        }
+
+        function addMcpServerByUrl() {
+            const urlEl = document.getElementById('mcp-direct-url');
+            const url = (urlEl?.value || '').trim();
+            if (!url) return;
+            const name = url.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+            const servers = loadMcpServers();
+            servers.push({
+                id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+                name,
+                url,
+                apiKey: '',
+                token: '',
+                headersJson: '{}',
+                toolsJson: '[]'
+            });
+            saveMcpServers(servers);
+            if (urlEl) urlEl.value = '';
+        }
+
+        function exportMcpConfig() {
+            const servers = loadMcpServers().map((s) => {
+                let headers = {};
+                let tools = [];
+                try { headers = s.headersJson ? JSON.parse(s.headersJson) : {}; } catch { headers = {}; }
+                try { tools = s.toolsJson ? JSON.parse(s.toolsJson) : []; } catch { tools = []; }
+                return {
+                    id: s.id,
+                    name: s.name,
+                    url: s.url,
+                    auth: { apiKey: s.apiKey || '', token: s.token || '' },
+                    headers,
+                    tools
+                };
+            });
+            const payload = { version: 1, servers };
+            const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'mcp.json';
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(a.href), 500);
+        }
+
+        async function importMcpConfigFromFile(file) {
+            const text = await file.text();
+            const parsed = JSON.parse(text);
+            const servers = Array.isArray(parsed?.servers) ? parsed.servers : [];
+            const normalized = servers.map((s) => ({
+                id: s.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+                name: s.name || s.id || 'mcp-server',
+                url: s.url || '',
+                apiKey: s?.auth?.apiKey || '',
+                token: s?.auth?.token || '',
+                headersJson: JSON.stringify(s.headers || {}, null, 2),
+                toolsJson: JSON.stringify(s.tools || [], null, 2)
+            })).filter((s) => s.url);
+            saveMcpServers(normalized);
         }
 
         function deleteMcpServer(id) {
@@ -1683,8 +1797,8 @@
             saveMcpServers(servers);
         }
 
-        async function testMcpServer(id) {
-            const statusEl = document.getElementById(`mcp-status-${id}`);
+        async function testMcpServer(id, statusElementId = null) {
+            const statusEl = document.getElementById(statusElementId || `mcp-status-${id}`);
             const server = loadMcpServers().find(s => s.id === id);
             if (!server) return;
             statusEl.textContent = 'Testing...';
@@ -1712,7 +1826,12 @@
         }
 
         function renderMcpServers() {
-            const list = document.getElementById('mcp-server-list');
+            renderMcpServersInto('mcp-server-list', { compact: false });
+            renderMcpServersInto('settings-mcp-server-list', { compact: true });
+        }
+
+        function renderMcpServersInto(containerId, { compact } = {}) {
+            const list = document.getElementById(containerId);
             if (!list) return;
             const servers = loadMcpServers();
             list.innerHTML = '';
@@ -1723,7 +1842,20 @@
 
             servers.forEach((s) => {
                 const card = document.createElement('div');
-                card.className = 'bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-3';
+                card.className = compact
+                    ? 'bg-gray-900/40 border border-gray-700 rounded-lg p-3 space-y-2'
+                    : 'bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-3';
+
+                const toolsPreview = (() => {
+                    try {
+                        const tools = s.toolsJson ? JSON.parse(s.toolsJson) : [];
+                        if (!Array.isArray(tools) || tools.length === 0) return '—';
+                        return tools.slice(0, 8).join(', ') + (tools.length > 8 ? '…' : '');
+                    } catch {
+                        return 'Invalid tools JSON';
+                    }
+                })();
+
                 card.innerHTML = `
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0">
@@ -1731,40 +1863,50 @@
                             <div class="text-xs text-gray-400 truncate">${sanitizeHtml(s.url)}</div>
                         </div>
                         <div class="flex gap-2 shrink-0">
-                            <button class="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs" type="button" id="mcp-test-${s.id}">Test</button>
-                            <button class="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs" type="button" id="mcp-del-${s.id}">Delete</button>
+                            <button class="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs" type="button" id="${containerId}-mcp-test-${s.id}">Test</button>
+                            <button class="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs" type="button" id="${containerId}-mcp-del-${s.id}">Delete</button>
                         </div>
                     </div>
+                    <div class="text-xs text-gray-300">Tools: <span class="text-gray-100">${sanitizeHtml(toolsPreview)}</span></div>
+                    ${compact ? '' : `
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">API Key</label>
-                            <input type="password" value="${sanitizeHtml(s.apiKey || '')}" class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500" id="mcp-apikey-${s.id}">
+                            <input type="password" value="${sanitizeHtml(s.apiKey || '')}" class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500" id="${containerId}-mcp-apikey-${s.id}">
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Bearer Token</label>
-                            <input type="password" value="${sanitizeHtml(s.token || '')}" class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500" id="mcp-token-${s.id}">
+                            <input type="password" value="${sanitizeHtml(s.token || '')}" class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500" id="${containerId}-mcp-token-${s.id}">
                         </div>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Extra Headers (JSON)</label>
-                        <textarea rows="2" class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500 font-mono" id="mcp-headers-${s.id}">${sanitizeHtml(s.headersJson || '{}')}</textarea>
+                        <textarea rows="2" class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500 font-mono" id="${containerId}-mcp-headers-${s.id}">${sanitizeHtml(s.headersJson || '{}')}</textarea>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Tools (JSON array)</label>
+                        <textarea rows="2" class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500 font-mono" id="${containerId}-mcp-tools-${s.id}">${sanitizeHtml(s.toolsJson || '[]')}</textarea>
                     </div>
                     <div class="flex items-center justify-between">
-                        <div class="text-xs text-gray-300">Status: <span class="text-gray-100" id="mcp-status-${s.id}">—</span></div>
-                        <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs" type="button" id="mcp-save-${s.id}">Save</button>
+                        <div class="text-xs text-gray-300">Status: <span class="text-gray-100" id="${containerId}-mcp-status-${s.id}">—</span></div>
+                        <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs" type="button" id="${containerId}-mcp-save-${s.id}">Save</button>
                     </div>
+                    `}
                 `;
                 list.appendChild(card);
 
-                document.getElementById(`mcp-del-${s.id}`).onclick = () => deleteMcpServer(s.id);
-                document.getElementById(`mcp-test-${s.id}`).onclick = () => testMcpServer(s.id);
-                document.getElementById(`mcp-save-${s.id}`).onclick = () => {
-                    updateMcpServer(s.id, {
-                        apiKey: document.getElementById(`mcp-apikey-${s.id}`).value || '',
-                        token: document.getElementById(`mcp-token-${s.id}`).value || '',
-                        headersJson: document.getElementById(`mcp-headers-${s.id}`).value || '{}'
-                    });
-                };
+                document.getElementById(`${containerId}-mcp-del-${s.id}`).onclick = () => deleteMcpServer(s.id);
+                document.getElementById(`${containerId}-mcp-test-${s.id}`).onclick = () => testMcpServer(s.id, `${containerId}-mcp-status-${s.id}`);
+                if (!compact) {
+                    document.getElementById(`${containerId}-mcp-save-${s.id}`).onclick = () => {
+                        updateMcpServer(s.id, {
+                            apiKey: document.getElementById(`${containerId}-mcp-apikey-${s.id}`).value || '',
+                            token: document.getElementById(`${containerId}-mcp-token-${s.id}`).value || '',
+                            headersJson: document.getElementById(`${containerId}-mcp-headers-${s.id}`).value || '{}',
+                            toolsJson: document.getElementById(`${containerId}-mcp-tools-${s.id}`).value || '[]'
+                        });
+                    };
+                }
             });
         }
 

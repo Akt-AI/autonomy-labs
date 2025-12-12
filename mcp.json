@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "servers": [
+    {
+      "id": "example-local",
+      "name": "Example MCP Server",
+      "url": "http://localhost:3000/mcp",
+      "auth": {
+        "apiKey": "",
+        "token": ""
+      },
+      "headers": {},
+      "tools": [
+        "search",
+        "read_file",
+        "write_file"
+      ]
+    }
+  ]
+}
+
