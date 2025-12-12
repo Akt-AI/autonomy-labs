@@ -1,3 +1,12 @@
+# ---
+# title: Autonomy Labs Sandbox
+# emoji: 🚀
+# colorFrom: blue
+# colorTo: purple
+# sdk: docker
+# pinned: false
+# ---
+
 # Autonomy Labs Sandbox
 
 A lightweight web UI for chat + autonomous mode + terminal tabs, backed by FastAPI and Supabase Auth/DB.
@@ -55,4 +64,3 @@ docker run --rm -p 7860:7860 --env-file .env autonomy-labs
 
 - **Secrets**: don’t hardcode API keys in source. GitHub push protection will block pushes containing tokens.
 - **Terminal PTY**: the host/container must have PTY devices (`/dev/pts`) available for interactive terminals.
-
