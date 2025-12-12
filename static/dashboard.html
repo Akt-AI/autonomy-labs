@@ -236,16 +236,19 @@
                     class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition"
                     id="nav-dashboard">Dashboard</button>
                 <button onclick="switchMode('chat')"
-                    class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition" id="nav-chat">AI Chat</button>
-                <button onclick="switchMode('agent')"
-                    class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition"
-                    id="nav-agent">Autonomous Mode</button>
+                    class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition" id="nav-chat">Chat</button>
                 <button onclick="switchMode('mcp')"
                     class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition"
                     id="nav-mcp">MCP Admin</button>
                 <button onclick="switchMode('terminal')"
                     class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition"
-                    id="nav-terminal">Terminal</button>
+                    id="nav-terminal" title="Terminal" aria-label="Terminal">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5h16v14H4V5z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 9l3 3-3 3" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 15h6" />
+                    </svg>
+                </button>
             </div>
             <div class="flex items-center gap-3 min-w-0">
                 <div id="user-badge" class="hidden md:flex flex-col items-end leading-tight min-w-0">
@@ -261,10 +264,7 @@
             <button onclick="switchMode('dashboard')"
                 class="block w-full text-left px-3 py-2 rounded hover:bg-gray-700 text-gray-300">Dashboard</button>
             <button onclick="switchMode('chat')"
-                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-700 text-gray-300">AI Chat</button>
-            <button onclick="switchMode('agent')"
-                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-700 text-gray-300">Autonomous
-                Mode</button>
+                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-700 text-gray-300">Chat</button>
             <button onclick="switchMode('mcp')"
                 class="block w-full text-left px-3 py-2 rounded hover:bg-gray-700 text-gray-300">MCP Admin</button>
             <button onclick="switchMode('terminal')"
@@ -285,9 +285,9 @@
                 coding assistance or the Terminal for execution.</p>
             <div class="flex gap-4 mb-8">
                 <button onclick="switchMode('chat')"
-                    class="px-6 py-3 bg-blue-600 rounded-lg hover:bg-blue-700 font-semibold transition">Open AI
+                    class="px-6 py-3 bg-blue-600 rounded-lg hover:bg-blue-700 font-semibold transition">Open
                     Chat</button>
-                <button onclick="switchMode('agent')"
+                <button onclick="openAutonomousMode()"
                     class="px-6 py-3 bg-indigo-600 rounded-lg hover:bg-indigo-700 font-semibold transition">Open
                     Autonomous Mode</button>
                 <button onclick="switchMode('terminal')"
@@ -356,16 +356,24 @@
                         </button>
                         <h2 class="text-lg font-semibold truncate" id="current-chat-title">New Chat</h2>
                     </div>
-                    <button onclick="toggleSettings()"
-                        class="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-700 transition">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
-                            </path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                        </svg>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <div class="hidden md:flex bg-gray-700/60 rounded-lg p-1">
+                            <button id="chat-mode-chat" onclick="setChatMode('chat')"
+                                class="px-2 py-1 text-xs rounded-md text-gray-200 hover:bg-white/10 transition">Chat</button>
+                            <button id="chat-mode-auto" onclick="setChatMode('autonomous')"
+                                class="px-2 py-1 text-xs rounded-md text-gray-200 hover:bg-white/10 transition">Autonomous</button>
+                        </div>
+                        <button onclick="toggleSettings()"
+                            class="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-700 transition">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                                </path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Settings Modal (Overlay) -->
@@ -428,41 +436,100 @@
                     </div>
                 </div>
 
-                <!-- Messages -->
-                <div id="chat-history" class="flex-grow p-4 overflow-y-auto space-y-4 scroll-smooth"></div>
+                <div id="chat-standard" class="flex-grow flex flex-col min-h-0">
+                    <!-- Messages -->
+                    <div id="chat-history" class="flex-grow p-4 overflow-y-auto space-y-4 scroll-smooth"></div>
 
-                <!-- Input -->
-                <div class="p-3 bg-gray-800 border-t border-gray-700 shrink-0">
-                    <div id="chat-attachments" class="max-w-4xl mx-auto mb-2 hidden"></div>
-                    <div class="flex space-x-2 max-w-4xl mx-auto items-end">
-                        <textarea id="chat-input" rows="1"
-                            class="flex-grow bg-gray-700 p-3 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-32"
-                            placeholder="Message..."
-                            oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
-                            onkeydown="handleEnter(event)"></textarea>
-                        <input id="chat-file-input" type="file" accept="image/*" multiple class="hidden" />
-                        <button onclick="document.getElementById('chat-file-input').click()"
-                            class="bg-gray-700 px-3 py-3 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
-                            title="Attach images">
-                            📎
-                        </button>
-                        <button onclick="captureScreenshotToChat()"
-                            class="bg-gray-700 px-3 py-3 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
-                            title="Take screenshot">
-                            ⧉
-                        </button>
-                        <button id="chat-stop-btn" onclick="stopChatGeneration()" disabled
-                            class="bg-gray-600 px-3 rounded-lg hover:bg-gray-700 font-bold transition flex items-center disabled:opacity-40 disabled:cursor-not-allowed"
-                            title="Stop generating">
-                            Stop
-                        </button>
-                        <button onclick="sendMessage()"
-                            class="bg-blue-600 px-4 rounded-lg hover:bg-blue-700 font-bold transition flex items-center">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                            </svg>
-                        </button>
+                    <!-- Input -->
+                    <div class="p-3 bg-gray-800 border-t border-gray-700 shrink-0">
+                        <div id="chat-attachments" class="max-w-4xl mx-auto mb-2 hidden"></div>
+                        <div class="flex space-x-2 max-w-4xl mx-auto items-end">
+                            <textarea id="chat-input" rows="1"
+                                class="flex-grow bg-gray-700 p-3 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-32"
+                                placeholder="Message..."
+                                oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
+                                onkeydown="handleEnter(event)"></textarea>
+                            <input id="chat-file-input" type="file" accept="image/*" multiple class="hidden" />
+                            <button onclick="document.getElementById('chat-file-input').click()"
+                                class="bg-gray-700 px-3 py-3 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
+                                title="Attach images">
+                                📎
+                            </button>
+                            <button onclick="captureScreenshotToChat()"
+                                class="bg-gray-700 px-3 py-3 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
+                                title="Take screenshot">
+                                ⧉
+                            </button>
+                            <button id="chat-stop-btn" onclick="stopChatGeneration()" disabled
+                                class="bg-gray-600 px-3 rounded-lg hover:bg-gray-700 font-bold transition flex items-center disabled:opacity-40 disabled:cursor-not-allowed"
+                                title="Stop generating">
+                                Stop
+                            </button>
+                            <button onclick="sendMessage()"
+                                class="bg-blue-600 px-4 rounded-lg hover:bg-blue-700 font-bold transition flex items-center">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Autonomous mode embedded in Chat view -->
+                <div id="chat-autonomous" class="hidden flex-grow min-h-0">
+                    <div id="agent-split-root" class="split-root">
+                        <div id="agent-pane-chat" class="split-pane min-h-0 flex flex-col border-r border-gray-700">
+                            <div class="flex-grow min-h-0 overflow-hidden">
+                                <div id="agent-chat-history" class="h-full p-4 overflow-y-auto space-y-4"></div>
+                            </div>
+                            <div class="p-3 bg-gray-800 border-t border-gray-700 shrink-0">
+                                <div id="agent-attachments" class="mb-2 hidden"></div>
+                                <div class="flex space-x-2 items-end">
+                                    <textarea id="agent-chat-input" rows="1"
+                                        class="flex-grow bg-gray-700 p-3 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-32"
+                                        placeholder="Ask agent..."
+                                        oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
+                                        onkeydown="handleAgentEnter(event)"></textarea>
+                                    <input id="agent-file-input" type="file" accept="image/*" multiple class="hidden" />
+                                    <button onclick="document.getElementById('agent-file-input').click()"
+                                        class="bg-gray-700 px-3 py-3 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
+                                        title="Attach images">
+                                        📎
+                                    </button>
+                                    <button onclick="captureScreenshotToAgent()"
+                                        class="bg-gray-700 px-3 py-3 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
+                                        title="Take screenshot">
+                                        ⧉
+                                    </button>
+                                    <button id="agent-stop-btn" onclick="stopAgentGeneration()" disabled
+                                        class="bg-gray-600 px-3 rounded-lg hover:bg-gray-700 font-bold transition flex items-center disabled:opacity-40 disabled:cursor-not-allowed"
+                                        title="Stop generating">
+                                        Stop
+                                    </button>
+                                    <button onclick="sendAgentMessage()"
+                                        class="bg-blue-600 px-4 rounded-lg hover:bg-blue-700 font-bold transition flex items-center">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="agent-split-divider" class="split-divider" title="Drag to resize panes"></div>
+                        <div id="agent-pane-terminal" class="split-pane min-h-0 agent-terminal-chrome flex flex-col">
+                            <div class="shrink-0 flex items-center bg-gray-900/60 border-b border-gray-700 overflow-x-auto">
+                                <div id="agent-terminal-tabs" class="flex"></div>
+                                <button onclick="toggleAgentTerminalCollapsed()"
+                                    class="ml-auto px-2 py-2 text-gray-300 hover:text-white hover:bg-white/10 transition font-bold"
+                                    title="Collapse terminal" aria-label="Collapse terminal">▦</button>
+                                <button onclick="createTerminalTab({ scope: 'agent' })"
+                                    class="px-3 py-2 text-gray-300 hover:text-white hover:bg-white/10 transition font-bold"
+                                    title="New Terminal">+</button>
+                            </div>
+                            <div id="agent-terminals-container" class="flex-grow relative w-full h-full"></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -504,63 +571,7 @@
             </div>
         </div>
 
-        <!-- Autonomous Mode View -->
-        <div id="agent-view" class="view-section hidden w-full h-full flex flex-col overflow-hidden bg-gray-900">
-            <div class="shrink-0 p-3 border-b border-gray-700 bg-gray-800 flex items-center justify-between">
-                <div class="font-semibold">Autonomous Mode</div>
-                <div class="text-xs text-gray-300">Use “Run in Terminal” on code blocks.</div>
-            </div>
-            <div id="agent-split-root" class="split-root">
-                <div id="agent-pane-chat" class="split-pane min-h-0 flex flex-col border-r border-gray-700">
-                    <div class="flex-grow min-h-0 overflow-hidden">
-                        <div id="agent-chat-history" class="h-full p-4 overflow-y-auto space-y-4"></div>
-                    </div>
-                    <div class="p-3 bg-gray-800 border-t border-gray-700 shrink-0">
-                        <div id="agent-attachments" class="mb-2 hidden"></div>
-                        <div class="flex space-x-2 items-end">
-                            <textarea id="agent-chat-input" rows="1"
-                                class="flex-grow bg-gray-700 p-3 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-32"
-                                placeholder="Ask agent..."
-                                oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
-                                onkeydown="handleAgentEnter(event)"></textarea>
-                            <input id="agent-file-input" type="file" accept="image/*" multiple class="hidden" />
-                            <button onclick="document.getElementById('agent-file-input').click()"
-                                class="bg-gray-700 px-3 py-3 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
-                                title="Attach images">
-                                📎
-                            </button>
-                            <button onclick="captureScreenshotToAgent()"
-                                class="bg-gray-700 px-3 py-3 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
-                                title="Take screenshot">
-                                ⧉
-                            </button>
-                            <button id="agent-stop-btn" onclick="stopAgentGeneration()" disabled
-                                class="bg-gray-600 px-3 rounded-lg hover:bg-gray-700 font-bold transition flex items-center disabled:opacity-40 disabled:cursor-not-allowed"
-                                title="Stop generating">
-                                Stop
-                            </button>
-                            <button onclick="sendAgentMessage()"
-                                class="bg-blue-600 px-4 rounded-lg hover:bg-blue-700 font-bold transition flex items-center">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                <div id="agent-split-divider" class="split-divider" title="Drag to resize panes"></div>
-                <div id="agent-pane-terminal" class="split-pane min-h-0 agent-terminal-chrome flex flex-col">
-                    <div class="shrink-0 flex items-center bg-gray-900/60 border-b border-gray-700 overflow-x-auto">
-                        <div id="agent-terminal-tabs" class="flex"></div>
-                        <button onclick="createTerminalTab({ scope: 'agent' })"
-                            class="px-3 py-2 text-gray-300 hover:text-white hover:bg-white/10 transition font-bold"
-                            title="New Terminal">+</button>
-                    </div>
-                    <div id="agent-terminals-container" class="flex-grow relative w-full h-full"></div>
-                </div>
-            </div>
-        </div>
+        <!-- Autonomous Mode View removed (now embedded in Chat) -->
 
     </div>
 
@@ -764,7 +775,9 @@
                 });
 
                 initProviderPresets();
-                initAgentSplitPane();
+                // Restore last chat mode (chat/autonomous)
+                const savedMode = localStorage.getItem('chat_mode_v1') || 'chat';
+                setChatMode(savedMode);
 
                 // Multi-modal attachments
                 const chatFile = document.getElementById('chat-file-input');
@@ -838,7 +851,7 @@
 
         // --- View Switching ---
         function switchMode(mode) {
-            const sections = ['dashboard', 'chat', 'terminal', 'mcp', 'agent'];
+            const sections = ['dashboard', 'chat', 'terminal', 'mcp'];
             sections.forEach((m) => {
                 const el = document.getElementById(`${m}-view`);
                 const btn = document.getElementById(`nav-${m}`);
@@ -847,7 +860,6 @@
             });
 
             if (mode === 'terminal' && activeTerminalId) setTimeout(() => fitTerm(activeTerminalId), 50);
-            if (mode === 'agent' && activeAgentTerminalId) setTimeout(() => fitTerm(activeAgentTerminalId), 50);
             if (mode === 'mcp') renderMcpServers();
 
             document.getElementById('mobile-menu').classList.add('hidden');
@@ -1005,13 +1017,14 @@
             if (!root || !paneChat || !paneTerminal || !divider) return;
 
             const key = 'agent_split_ratio_v1';
+            const collapseKey = 'agent_terminal_collapsed_v1';
             const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
             const applyRatio = (ratio) => {
                 const r = clamp(ratio, 0.2, 0.8);
                 paneChat.style.flex = `0 0 ${Math.round(r * 1000) / 10}%`;
                 paneTerminal.style.flex = '1 1 auto';
                 // Refit visible terminals (agent + main)
-                if (activeAgentTerminalId && !document.getElementById('agent-view').classList.contains('hidden')) {
+                if (activeAgentTerminalId && !document.getElementById('chat-view').classList.contains('hidden')) {
                     setTimeout(() => fitTerm(activeAgentTerminalId), 0);
                 }
             };
@@ -1019,6 +1032,14 @@
             const saved = Number(localStorage.getItem(key));
             if (Number.isFinite(saved) && saved > 0) applyRatio(saved);
             else applyRatio(0.48);
+
+            // Restore collapsed state
+            const collapsed = localStorage.getItem(collapseKey) === '1';
+            if (collapsed) {
+                paneTerminal.classList.add('hidden');
+                divider.classList.add('hidden');
+                paneChat.style.flex = '1 1 auto';
+            }
 
             let dragging = false;
             const onMove = (clientX) => {
@@ -1051,9 +1072,61 @@
             });
         }
 
+        function toggleAgentTerminalCollapsed() {
+            const paneChat = document.getElementById('agent-pane-chat');
+            const paneTerminal = document.getElementById('agent-pane-terminal');
+            const divider = document.getElementById('agent-split-divider');
+            if (!paneChat || !paneTerminal || !divider) return;
+            const key = 'agent_terminal_collapsed_v1';
+
+            const isCollapsed = paneTerminal.classList.contains('hidden');
+            if (isCollapsed) {
+                paneTerminal.classList.remove('hidden');
+                divider.classList.remove('hidden');
+                const ratio = Number(localStorage.getItem('agent_split_ratio_v1')) || 0.48;
+                paneChat.style.flex = `0 0 ${Math.round(Math.max(0.2, Math.min(0.8, ratio)) * 1000) / 10}%`;
+                paneTerminal.style.flex = '1 1 auto';
+                localStorage.setItem(key, '0');
+                if (activeAgentTerminalId) setTimeout(() => fitTerm(activeAgentTerminalId), 50);
+            } else {
+                paneTerminal.classList.add('hidden');
+                divider.classList.add('hidden');
+                paneChat.style.flex = '1 1 auto';
+                localStorage.setItem(key, '1');
+            }
+        }
+
+        function setChatMode(mode) {
+            const standard = document.getElementById('chat-standard');
+            const auto = document.getElementById('chat-autonomous');
+            const btnChat = document.getElementById('chat-mode-chat');
+            const btnAuto = document.getElementById('chat-mode-auto');
+            if (!standard || !auto) return;
+            const m = mode === 'autonomous' ? 'autonomous' : 'chat';
+
+            standard.classList.toggle('hidden', m === 'autonomous');
+            auto.classList.toggle('hidden', m !== 'autonomous');
+            if (btnChat) btnChat.classList.toggle('bg-white/10', m === 'chat');
+            if (btnAuto) btnAuto.classList.toggle('bg-white/10', m === 'autonomous');
+
+            localStorage.setItem('chat_mode_v1', m);
+            if (m === 'autonomous') {
+                if (!activeAgentTerminalId) activeAgentTerminalId = createTerminalTab({ scope: 'agent' });
+                setTimeout(() => {
+                    initAgentSplitPane();
+                    if (activeAgentTerminalId) fitTerm(activeAgentTerminalId);
+                }, 0);
+            }
+        }
+
+        function openAutonomousMode() {
+            switchMode('chat');
+            setChatMode('autonomous');
+        }
+
         window.addEventListener('resize', () => {
             if (activeTerminalId && !document.getElementById('terminal-view').classList.contains('hidden')) fitTerm(activeTerminalId);
-            if (activeAgentTerminalId && !document.getElementById('agent-view').classList.contains('hidden')) fitTerm(activeAgentTerminalId);
+            if (activeAgentTerminalId && !document.getElementById('chat-view').classList.contains('hidden') && !document.getElementById('chat-autonomous').classList.contains('hidden')) fitTerm(activeAgentTerminalId);
         });
 
         // --- Chat Logic ---
