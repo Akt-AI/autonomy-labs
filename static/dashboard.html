@@ -11,6 +11,7 @@
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
 
     <!-- KaTeX -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
@@ -74,6 +75,23 @@
             opacity: 1;
         }
 
+        .run-btn {
+            position: absolute;
+            top: 5px;
+            right: 56px;
+            background: #2563eb;
+            color: white;
+            border-radius: 4px;
+            padding: 2px 6px;
+            font-size: 0.75rem;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .chat-message pre:hover .run-btn {
+            opacity: 1;
+        }
+
         .xterm-viewport {
             overflow-y: hidden !important;
         }
@@ -115,6 +133,12 @@
                     id="nav-dashboard">Dashboard</button>
                 <button onclick="switchMode('chat')"
                     class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition" id="nav-chat">AI Chat</button>
+                <button onclick="switchMode('agent')"
+                    class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition"
+                    id="nav-agent">Autonomous Mode</button>
+                <button onclick="switchMode('mcp')"
+                    class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition"
+                    id="nav-mcp">MCP Admin</button>
                 <button onclick="switchMode('terminal')"
                     class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition"
                     id="nav-terminal">Terminal</button>
@@ -128,6 +152,11 @@
                 class="block w-full text-left px-3 py-2 rounded hover:bg-gray-700 text-gray-300">Dashboard</button>
             <button onclick="switchMode('chat')"
                 class="block w-full text-left px-3 py-2 rounded hover:bg-gray-700 text-gray-300">AI Chat</button>
+            <button onclick="switchMode('agent')"
+                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-700 text-gray-300">Autonomous
+                Mode</button>
+            <button onclick="switchMode('mcp')"
+                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-700 text-gray-300">MCP Admin</button>
             <button onclick="switchMode('terminal')"
                 class="block w-full text-left px-3 py-2 rounded hover:bg-gray-700 text-gray-300">Terminal</button>
         </div>
@@ -285,14 +314,164 @@
             </div>
         </div>
 
+        <!-- MCP Admin View -->
+        <div id="mcp-view" class="view-section hidden w-full h-full overflow-y-auto bg-gray-900">
+            <div class="max-w-5xl mx-auto p-4 space-y-4">
+                <div class="flex items-center justify-between gap-3">
+                    <h2 class="text-xl font-semibold">MCP Admin</h2>
+                    <button onclick="addMcpServerPrompt()"
+                        class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-sm font-medium transition">+
+                        Add Server</button>
+                </div>
+                <div class="text-xs text-yellow-300 bg-yellow-900/30 border border-yellow-700 rounded p-3">
+                    Credentials are stored in `localStorage` on this browser. Avoid using production secrets on shared
+                    machines.
+                </div>
+                <div id="mcp-server-list" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- Autonomous Mode View -->
+        <div id="agent-view" class="view-section hidden w-full h-full flex flex-col overflow-hidden bg-gray-900">
+            <div class="shrink-0 p-3 border-b border-gray-700 bg-gray-800 flex items-center justify-between">
+                <div class="font-semibold">Autonomous Mode</div>
+                <div class="text-xs text-gray-300">Use “Run in Terminal” on code blocks.</div>
+            </div>
+            <div class="flex-grow grid grid-cols-1 lg:grid-cols-2 min-h-0">
+                <div class="min-h-0 flex flex-col border-r border-gray-700">
+                    <div class="flex-grow min-h-0 overflow-hidden">
+                        <div id="agent-chat-history" class="h-full p-4 overflow-y-auto space-y-4"></div>
+                    </div>
+                    <div class="p-3 bg-gray-800 border-t border-gray-700 shrink-0">
+                        <div class="flex space-x-2">
+                            <textarea id="agent-chat-input" rows="1"
+                                class="flex-grow bg-gray-700 p-3 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-32"
+                                placeholder="Ask agent..."
+                                oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
+                                onkeydown="handleAgentEnter(event)"></textarea>
+                            <button onclick="sendAgentMessage()"
+                                class="bg-blue-600 px-4 rounded-lg hover:bg-blue-700 font-bold transition flex items-center">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="min-h-0 bg-black flex flex-col">
+                    <div class="shrink-0 flex items-center bg-gray-800 border-b border-gray-700 overflow-x-auto">
+                        <div id="agent-terminal-tabs" class="flex"></div>
+                        <button onclick="createTerminalTab({ scope: 'agent' })"
+                            class="px-3 py-2 text-gray-400 hover:text-white hover:bg-gray-700 transition font-bold"
+                            title="New Terminal">+</button>
+                    </div>
+                    <div id="agent-terminals-container" class="flex-grow relative w-full h-full"></div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script>
         let supabase;
         // --- Multi-Terminal Logic ---
-        let terminals = {}; // { id: { term, fitAddon, ws, containerId } }
-        let activeTerminalId = null;
+        let terminals = {}; // { id: { term, fitAddon, ws, containerId, scope } }
+        let activeTerminalId = null; // scope: 'main'
+        let activeAgentTerminalId = null; // scope: 'agent'
         let terminalCount = 0;
+
+        const DOMPURIFY_CONFIG = {
+            USE_PROFILES: { html: true, svg: true, mathMl: true },
+            ADD_ATTR: ['data-language', 'data-lang', 'class', 'style']
+        };
+
+        function sanitizeHtml(html) {
+            if (!window.DOMPurify) return html;
+            return window.DOMPurify.sanitize(html, DOMPURIFY_CONFIG);
+        }
+
+        function preprocessMathDelimiters(text) {
+            if (!text) return text;
+            return text
+                .replace(/\\\[/g, '$$')
+                .replace(/\\\]/g, '$$')
+                .replace(/\\\(/g, '$')
+                .replace(/\\\)/g, '$');
+        }
+
+        function renderMathInMessage(containerEl) {
+            if (!containerEl || typeof renderMathInElement !== 'function') return;
+            try {
+                renderMathInElement(containerEl, {
+                    delimiters: [
+                        { left: '$$', right: '$$', display: true },
+                        { left: '$', right: '$', display: false }
+                    ],
+                    throwOnError: false
+                });
+            } catch (e) {
+                console.log('KaTeX render error:', e);
+            }
+        }
+
+        function renderMarkdownInto(containerEl, markdown) {
+            const normalized = preprocessMathDelimiters(markdown || '');
+            const html = marked.parse(normalized);
+            containerEl.innerHTML = sanitizeHtml(html);
+            containerEl.querySelectorAll('pre code').forEach((block) => {
+                try { hljs.highlightElement(block); } catch { }
+            });
+            renderMathInMessage(containerEl);
+            wireMessageCodeActions(containerEl);
+        }
+
+        function wireMessageCodeActions(containerEl) {
+            containerEl.querySelectorAll('pre').forEach((pre) => {
+                if (pre.querySelector('.copy-btn')) return;
+                const codeEl = pre.querySelector('code');
+                if (!codeEl) return;
+
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'copy-btn';
+                copyBtn.type = 'button';
+                copyBtn.textContent = 'Copy';
+                copyBtn.onclick = async () => {
+                    try {
+                        await navigator.clipboard.writeText(codeEl.innerText);
+                        copyBtn.textContent = 'Copied';
+                        setTimeout(() => (copyBtn.textContent = 'Copy'), 800);
+                    } catch { }
+                };
+
+                const runBtn = document.createElement('button');
+                runBtn.className = 'run-btn';
+                runBtn.type = 'button';
+                runBtn.textContent = 'Run';
+                runBtn.onclick = async () => {
+                    const cmd = codeEl.innerText.replace(/\n+$/, '');
+                    if (!cmd) return;
+                    const agentVisible = !document.getElementById('agent-view').classList.contains('hidden');
+                    await runInTerminal(cmd + '\n', { preferScope: agentVisible ? 'agent' : 'main', autoShow: true });
+                };
+
+                pre.appendChild(copyBtn);
+                pre.appendChild(runBtn);
+            });
+        }
+
+        async function runInTerminal(data, { preferScope = 'main', autoShow = false } = {}) {
+            const desiredId = preferScope === 'agent' ? activeAgentTerminalId : activeTerminalId;
+            if (!desiredId || !terminals[desiredId] || terminals[desiredId].ws.readyState !== WebSocket.OPEN) {
+                const newId = createTerminalTab({ scope: preferScope });
+                if (preferScope === 'agent') activeAgentTerminalId = newId;
+                else activeTerminalId = newId;
+            }
+            const id = preferScope === 'agent' ? activeAgentTerminalId : activeTerminalId;
+            const t = terminals[id];
+            if (autoShow) switchMode(preferScope === 'agent' ? 'agent' : 'terminal');
+            if (t && t.ws && t.ws.readyState === WebSocket.OPEN) t.ws.send(data);
+        }
 
         function toggleSettings() {
             document.getElementById('chat-settings').classList.toggle('hidden');
@@ -322,89 +501,85 @@
 
         // --- View Switching ---
         function switchMode(mode) {
-            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
-            document.getElementById(mode + '-view').classList.remove('hidden');
+            const sections = ['dashboard', 'chat', 'terminal', 'mcp', 'agent'];
+            sections.forEach((m) => {
+                const el = document.getElementById(`${m}-view`);
+                const btn = document.getElementById(`nav-${m}`);
+                if (el) el.classList.toggle('hidden', m !== mode);
+                if (btn) btn.classList.toggle('bg-gray-700', m === mode);
+            });
 
-            document.querySelectorAll('nav button[id^="nav-"]').forEach(b => b.classList.remove('bg-gray-700', 'text-white'));
-            const navBtn = document.getElementById('nav-' + mode);
-            if (navBtn) navBtn.classList.add('bg-gray-700', 'text-white');
+            if (mode === 'terminal' && activeTerminalId) setTimeout(() => fitTerm(activeTerminalId), 50);
+            if (mode === 'agent' && activeAgentTerminalId) setTimeout(() => fitTerm(activeAgentTerminalId), 50);
+            if (mode === 'mcp') renderMcpServers();
 
-            if (mode === 'terminal' && activeTerminalId) {
-                setTimeout(() => fitTerm(activeTerminalId), 100);
-            }
             document.getElementById('mobile-menu').classList.add('hidden');
         }
 
-        // --- Terminal Tabs Logic ---
-        function createTerminalTab() {
-            terminalCount++;
-            const id = 'term-' + terminalCount;
+        // --- Terminal Tabs Logic (supports main + agent scopes) ---
+        function createTerminalTab({ scope = 'main' } = {}) {
+            terminalCount += 1;
+            const id = `term-${scope}-${terminalCount}`;
+            const containerId = id;
 
-            // 1. Create Container
-            const container = document.createElement('div');
-            container.id = id;
-            container.className = 'absolute top-0 left-0 w-full h-full hidden';
-            document.getElementById('terminals-container').appendChild(container);
+            const tabsEl = scope === 'agent' ? document.getElementById('agent-terminal-tabs') : document.getElementById('terminal-tabs');
+            const containersEl = scope === 'agent' ? document.getElementById('agent-terminals-container') : document.getElementById('terminals-container');
 
-            // 2. Create Instance
-            const term = new Terminal({
-                cursorBlink: true,
-                theme: { background: '#000000', foreground: '#f0f0f0' },
-                fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-                fontSize: 14
-            });
+            const tabBtn = document.createElement('button');
+            tabBtn.id = `tab-btn-${id}`;
+            tabBtn.className = "px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 border-r border-gray-700 flex items-center gap-2";
+            tabBtn.innerHTML = `<span>Term ${terminalCount}</span><span class="text-gray-500 hover:text-red-400" title="Close">×</span>`;
+            tabBtn.onclick = () => activateTerminalTab(id);
+            tabBtn.querySelector('span:last-child').onclick = (e) => closeTerminalTab(id, e);
+            tabsEl.appendChild(tabBtn);
+
+            const termDiv = document.createElement('div');
+            termDiv.id = containerId;
+            termDiv.className = "absolute inset-0";
+            termDiv.style.display = 'none';
+            containersEl.appendChild(termDiv);
+
+            const term = new Terminal({ convertEol: true, fontSize: 13, theme: { background: "#000000" } });
             const fitAddon = new FitAddon.FitAddon();
             term.loadAddon(fitAddon);
+            term.open(termDiv);
 
-            // BUG FIX: Open in the specific container, NOT 'terminal-container'
-            term.open(container);
+            const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/terminal`);
+            ws.onopen = () => { fitAddon.fit(); };
+            ws.onmessage = (event) => { term.write(event.data); };
+            ws.onclose = () => { term.write('\r\n[disconnected]\r\n'); };
 
-            // 3. Connect WS
-            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const ws = new WebSocket(`${protocol}//${window.location.host}/ws/terminal`);
-
-            ws.onopen = () => {
-                term.write('\r\n\x1b[32mWelcome to Terminal ' + terminalCount + '\x1b[0m\r\n');
-                const cols = term.cols;
-                const rows = term.rows;
-                ws.send(`\x01resize:${cols}:${rows}`);
-                fitAddon.fit();
-            };
-            ws.onmessage = e => term.write(e.data);
-            term.onData(d => ws.send(d));
-            term.onResize(size => {
-                if (ws.readyState === WebSocket.OPEN) ws.send(`\x01resize:${size.cols}:${size.rows}`);
+            term.onData((data) => {
+                if (ws.readyState === WebSocket.OPEN) ws.send(data);
             });
 
-            // 4. Store
-            terminals[id] = { term, fitAddon, ws, id };
-
-            // 5. Add Tab UI
-            const tabBtn = document.createElement('div');
-            tabBtn.id = 'tab-btn-' + id;
-            tabBtn.className = 'group flex items-center px-4 py-2 bg-gray-900 border-r border-gray-700 hover:bg-gray-700 cursor-pointer min-w-[120px] justify-between';
-            tabBtn.innerHTML = `
-                <span class="text-xs font-mono text-gray-300 truncate mr-2" onclick="activateTerminalTab('${id}')">Term ${terminalCount}</span>
-                <span class="text-gray-500 hover:text-red-500 font-bold text-xs p-1 rounded" onclick="closeTerminalTab('${id}', event)">×</span>
-            `;
-            document.getElementById('terminal-tabs').appendChild(tabBtn);
-
-            // 6. Activate
+            terminals[id] = { term, fitAddon, ws, containerId, scope };
             activateTerminalTab(id);
+            return id;
         }
 
         function activateTerminalTab(id) {
-            Object.values(terminals).forEach(t => {
-                document.getElementById(t.id).classList.add('hidden');
-                document.getElementById('tab-btn-' + t.id).classList.remove('bg-gray-800', 'border-b-2', 'border-blue-500');
-                document.getElementById('tab-btn-' + t.id).classList.add('bg-gray-900');
+            const t = terminals[id];
+            if (!t) return;
+            const scope = t.scope || 'main';
+
+            Object.keys(terminals).forEach((tid) => {
+                const termInfo = terminals[tid];
+                const visible = tid === id;
+                const el = document.getElementById(termInfo.containerId);
+                if (el) el.style.display = visible ? 'block' : 'none';
+
+                const tab = document.getElementById('tab-btn-' + tid);
+                if (tab) {
+                    tab.classList.toggle('bg-gray-900', !visible);
+                    tab.classList.toggle('bg-gray-800', visible);
+                    tab.classList.toggle('border-b-2', visible);
+                    tab.classList.toggle('border-blue-500', visible);
+                }
             });
 
-            activeTerminalId = id;
-            document.getElementById(id).classList.remove('hidden');
-            const tab = document.getElementById('tab-btn-' + id);
-            tab.classList.remove('bg-gray-900');
-            tab.classList.add('bg-gray-800', 'border-b-2', 'border-blue-500');
+            if (scope === 'agent') activeAgentTerminalId = id;
+            else activeTerminalId = id;
 
             setTimeout(() => {
                 fitTerm(id);
@@ -414,21 +589,27 @@
 
         function closeTerminalTab(id, event) {
             if (event) event.stopPropagation();
-            if (Object.keys(terminals).length === 1) {
-                alert("Cannot close the last terminal.");
+            const t = terminals[id];
+            if (!t) return;
+            const scope = t.scope || 'main';
+
+            const remainingInScope = Object.keys(terminals).filter(tid => (terminals[tid].scope || 'main') === scope && tid !== id);
+            if (remainingInScope.length === 0) {
+                alert("Cannot close the last terminal in this view.");
                 return;
             }
 
-            const t = terminals[id];
             t.ws.close();
             t.term.dispose();
-            document.getElementById(id).remove();
+            document.getElementById(t.containerId).remove();
             document.getElementById('tab-btn-' + id).remove();
             delete terminals[id];
 
-            if (activeTerminalId === id) {
-                const remaining = Object.keys(terminals);
-                if (remaining.length > 0) activateTerminalTab(remaining[remaining.length - 1]);
+            if (scope === 'agent' && activeAgentTerminalId === id) {
+                activateTerminalTab(remainingInScope[remainingInScope.length - 1]);
+            }
+            if (scope === 'main' && activeTerminalId === id) {
+                activateTerminalTab(remainingInScope[remainingInScope.length - 1]);
             }
         }
 
@@ -445,14 +626,11 @@
         }
 
         window.addEventListener('resize', () => {
-            if (activeTerminalId && !document.getElementById('terminal-view').classList.contains('hidden')) {
-                fitTerm(activeTerminalId);
-            }
+            if (activeTerminalId && !document.getElementById('terminal-view').classList.contains('hidden')) fitTerm(activeTerminalId);
+            if (activeAgentTerminalId && !document.getElementById('agent-view').classList.contains('hidden')) fitTerm(activeAgentTerminalId);
         });
 
         // --- Chat Logic ---
-
-        // --- Chat Logic (Restored) ---
         let chatHistory = [];
         let currentSessionId = null;
 
@@ -546,11 +724,11 @@
                     const { done, value } = await reader.read();
                     if (done) break;
                     aiContent += decoder.decode(value);
-                    aiMsgEl.innerText = aiContent; // Simple stream render
-                    scrollToBottom();
+                aiMsgEl.innerText = aiContent; // Simple stream render
+                scrollToBottom();
                 }
                 // Final Markdown
-                aiMsgEl.innerHTML = marked.parse(aiContent);
+                renderMarkdownInto(aiMsgEl, aiContent);
 
                 chatHistory.push({ role: 'assistant', content: aiContent });
                 if (currentSessionId) await supabase.from('chat_messages').insert({ session_id: currentSessionId, role: 'assistant', content: aiContent });
@@ -563,7 +741,7 @@
         function addMessageToUI(role, content) {
             const div = document.createElement('div');
             div.className = `chat-message ${role === 'user' ? 'user-message bg-blue-600 self-end' : 'ai-message bg-gray-700 self-start'} max-w-[85%] p-3 rounded-xl my-2 prose prose-invert break-words text-sm md:text-base shadow-sm`;
-            div.innerHTML = marked.parse(content);
+            renderMarkdownInto(div, content);
             document.getElementById('chat-history').appendChild(div);
             return div;
         }
@@ -578,6 +756,199 @@
                 e.preventDefault();
                 sendMessage();
             }
+        }
+
+        // --- Autonomous Mode (Agent) ---
+        let agentChatHistory = [];
+        async function sendAgentMessage() {
+            const input = document.getElementById('agent-chat-input');
+            const message = (input.value || '').trim();
+            if (!message) return;
+
+            addAgentMessageToUI('user', message);
+            agentChatHistory.push({ role: 'user', content: message });
+            input.value = '';
+            scrollAgentToBottom();
+
+            const apiKey = document.getElementById('chat-api-key').value;
+            const baseUrl = document.getElementById('chat-base-url').value;
+            const model = document.getElementById('chat-model').value;
+
+            const aiMsgEl = addAgentMessageToUI('assistant', '...');
+            let aiContent = '';
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages: agentChatHistory, apiKey, baseUrl, model })
+                });
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                aiMsgEl.innerHTML = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    aiContent += decoder.decode(value);
+                    aiMsgEl.innerText = aiContent;
+                    scrollAgentToBottom();
+                }
+
+                renderMarkdownInto(aiMsgEl, aiContent);
+                agentChatHistory.push({ role: 'assistant', content: aiContent });
+            } catch (error) {
+                aiMsgEl.textContent = "Error: " + error.message;
+            }
+        }
+
+        function handleAgentEnter(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendAgentMessage();
+            }
+        }
+
+        function addAgentMessageToUI(role, content) {
+            const div = document.createElement('div');
+            div.className = `chat-message ${role === 'user' ? 'user-message bg-blue-600 self-end' : 'ai-message bg-gray-700 self-start'} max-w-[85%] p-3 rounded-xl my-2 prose prose-invert break-words text-sm md:text-base shadow-sm`;
+            renderMarkdownInto(div, content);
+            document.getElementById('agent-chat-history').appendChild(div);
+            return div;
+        }
+
+        function scrollAgentToBottom() {
+            const container = document.getElementById('agent-chat-history');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // --- MCP Admin ---
+        const MCP_STORAGE_KEY = 'mcp_servers_v1';
+
+        function loadMcpServers() {
+            try {
+                return JSON.parse(localStorage.getItem(MCP_STORAGE_KEY) || '[]');
+            } catch {
+                return [];
+            }
+        }
+
+        function saveMcpServers(servers) {
+            localStorage.setItem(MCP_STORAGE_KEY, JSON.stringify(servers || []));
+            renderMcpServers();
+        }
+
+        function addMcpServerPrompt() {
+            const name = prompt('Server name (e.g., "local-mcp")');
+            if (!name) return;
+            const url = prompt('Server URL (e.g., "http://localhost:9000")');
+            if (!url) return;
+            const servers = loadMcpServers();
+            servers.push({
+                id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+                name,
+                url,
+                apiKey: '',
+                token: '',
+                headersJson: '{}'
+            });
+            saveMcpServers(servers);
+        }
+
+        function deleteMcpServer(id) {
+            if (!confirm('Delete this MCP server?')) return;
+            const servers = loadMcpServers().filter(s => s.id !== id);
+            saveMcpServers(servers);
+        }
+
+        function updateMcpServer(id, patch) {
+            const servers = loadMcpServers().map(s => (s.id === id ? { ...s, ...patch } : s));
+            saveMcpServers(servers);
+        }
+
+        async function testMcpServer(id) {
+            const statusEl = document.getElementById(`mcp-status-${id}`);
+            const server = loadMcpServers().find(s => s.id === id);
+            if (!server) return;
+            statusEl.textContent = 'Testing...';
+
+            let extraHeaders = {};
+            try {
+                extraHeaders = server.headersJson ? JSON.parse(server.headersJson) : {};
+            } catch (e) {
+                statusEl.textContent = 'Invalid headers JSON';
+                return;
+            }
+
+            const headers = {
+                ...extraHeaders
+            };
+            if (server.apiKey) headers['x-api-key'] = server.apiKey;
+            if (server.token) headers['Authorization'] = `Bearer ${server.token}`;
+
+            try {
+                const res = await fetch(server.url, { method: 'GET', headers });
+                statusEl.textContent = `HTTP ${res.status}`;
+            } catch (e) {
+                statusEl.textContent = `Error: ${e.message}`;
+            }
+        }
+
+        function renderMcpServers() {
+            const list = document.getElementById('mcp-server-list');
+            if (!list) return;
+            const servers = loadMcpServers();
+            list.innerHTML = '';
+            if (servers.length === 0) {
+                list.innerHTML = '<div class="text-gray-400 text-sm">No MCP servers configured.</div>';
+                return;
+            }
+
+            servers.forEach((s) => {
+                const card = document.createElement('div');
+                card.className = 'bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-3';
+                card.innerHTML = `
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="font-semibold truncate">${sanitizeHtml(s.name)}</div>
+                            <div class="text-xs text-gray-400 truncate">${sanitizeHtml(s.url)}</div>
+                        </div>
+                        <div class="flex gap-2 shrink-0">
+                            <button class="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs" type="button" id="mcp-test-${s.id}">Test</button>
+                            <button class="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs" type="button" id="mcp-del-${s.id}">Delete</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">API Key</label>
+                            <input type="password" value="${sanitizeHtml(s.apiKey || '')}" class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500" id="mcp-apikey-${s.id}">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Bearer Token</label>
+                            <input type="password" value="${sanitizeHtml(s.token || '')}" class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500" id="mcp-token-${s.id}">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Extra Headers (JSON)</label>
+                        <textarea rows="2" class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500 font-mono" id="mcp-headers-${s.id}">${sanitizeHtml(s.headersJson || '{}')}</textarea>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <div class="text-xs text-gray-300">Status: <span class="text-gray-100" id="mcp-status-${s.id}">—</span></div>
+                        <button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs" type="button" id="mcp-save-${s.id}">Save</button>
+                    </div>
+                `;
+                list.appendChild(card);
+
+                document.getElementById(`mcp-del-${s.id}`).onclick = () => deleteMcpServer(s.id);
+                document.getElementById(`mcp-test-${s.id}`).onclick = () => testMcpServer(s.id);
+                document.getElementById(`mcp-save-${s.id}`).onclick = () => {
+                    updateMcpServer(s.id, {
+                        apiKey: document.getElementById(`mcp-apikey-${s.id}`).value || '',
+                        token: document.getElementById(`mcp-token-${s.id}`).value || '',
+                        headersJson: document.getElementById(`mcp-headers-${s.id}`).value || '{}'
+                    });
+                };
+            });
         }
 
         // --- Provider & Models (Restored) ---
@@ -655,7 +1026,6 @@
                 document.getElementById('chat-model').value = config.model;
             }
         }
-
 
         init();
     </script>

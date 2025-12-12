@@ -4,6 +4,7 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y \
     curl \
     git \
+    vim \
     unzip \
     && rm -rf /var/lib/apt/lists/*
 
@@ -24,6 +25,33 @@ ENV PATH="$NVM_DIR/versions/node/v24.12.0/bin:$PATH"
 
 # Enable pnpm
 RUN corepack enable pnpm
+
+# Shorten terminal hostname/prompt for interactive shells
+ENV HOSTNAME=sandbox
+RUN echo 'export PS1="\\u@sandbox:\\w\\$ "' >> /root/.bashrc
+
+# Install real CLI tools (network required at build time)
+RUN npm install -g @google/generative-ai-cli @anthropic-ai/claude-code \
+    && printf '%s\n' \
+        '#!/usr/bin/env bash' \
+        'set -euo pipefail' \
+        '' \
+        '# Wrapper for Google Gemini/GenAI CLI (package name may change over time).' \
+        'for candidate in genai generative-ai gemini; do' \
+        '  if command -v \"$candidate\" >/dev/null 2>&1; then' \
+        '    exec \"$candidate\" \"$@\"' \
+        '  fi' \
+        'done' \
+        'echo \"Gemini CLI not found on PATH; package install may have changed.\" >&2' \
+        'exit 127' \
+      > /usr/local/bin/gemini-cli \
+    && chmod +x /usr/local/bin/gemini-cli \
+    && printf '%s\n' \
+        '#!/usr/bin/env bash' \
+        'echo \"codex: no official OpenAI CLI is installed in this image.\"' \
+        'echo \"Use the Codex CLI app or an OpenAI SDK instead.\"' \
+      > /usr/local/bin/codex \
+    && chmod +x /usr/local/bin/codex
 
 # Working directory
 WORKDIR /app
