@@ -96,6 +96,22 @@
             overflow-y: hidden !important;
         }
 
+        /* Ubuntu-ish terminal look */
+        .xterm, .xterm * {
+            font-family: "Ubuntu Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
+        /* Resizable terminal viewport wrapper */
+        .terminal-resizable {
+            resize: both;
+            overflow: auto;
+            min-width: 320px;
+            min-height: 200px;
+            max-width: 100%;
+            max-height: 100%;
+            position: relative;
+        }
+
         .chat-message {
             max-width: 80%;
             padding: 10px;
@@ -294,6 +310,11 @@
                             placeholder="Message..."
                             oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
                             onkeydown="handleEnter(event)"></textarea>
+                        <button id="chat-stop-btn" onclick="stopChatGeneration()" disabled
+                            class="bg-gray-600 px-3 rounded-lg hover:bg-gray-700 font-bold transition flex items-center disabled:opacity-40 disabled:cursor-not-allowed"
+                            title="Stop generating">
+                            Stop
+                        </button>
                         <button onclick="sendMessage()"
                             class="bg-blue-600 px-4 rounded-lg hover:bg-blue-700 font-bold transition flex items-center">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -360,6 +381,11 @@
                                 placeholder="Ask agent..."
                                 oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
                                 onkeydown="handleAgentEnter(event)"></textarea>
+                            <button id="agent-stop-btn" onclick="stopAgentGeneration()" disabled
+                                class="bg-gray-600 px-3 rounded-lg hover:bg-gray-700 font-bold transition flex items-center disabled:opacity-40 disabled:cursor-not-allowed"
+                                title="Stop generating">
+                                Stop
+                            </button>
                             <button onclick="sendAgentMessage()"
                                 class="bg-blue-600 px-4 rounded-lg hover:bg-blue-700 font-bold transition flex items-center">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -615,11 +641,39 @@
 
             const termDiv = document.createElement('div');
             termDiv.id = containerId;
-            termDiv.className = "absolute inset-0";
+            termDiv.className = "absolute inset-0 terminal-resizable";
             termDiv.style.display = 'none';
             containersEl.appendChild(termDiv);
 
-            const term = new Terminal({ convertEol: true, fontSize: 13, theme: { background: "#000000" } });
+            const term = new Terminal({
+                convertEol: true,
+                fontSize: 14,
+                cursorBlink: true,
+                fontFamily: '"Ubuntu Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                theme: {
+                    background: "#300a24",
+                    foreground: "#eeeeec",
+                    cursor: "#eeeeec",
+                    cursorAccent: "#300a24",
+                    selectionBackground: "rgba(238, 238, 236, 0.25)",
+                    black: "#2e3436",
+                    red: "#cc0000",
+                    green: "#4e9a06",
+                    yellow: "#c4a000",
+                    blue: "#3465a4",
+                    magenta: "#75507b",
+                    cyan: "#06989a",
+                    white: "#d3d7cf",
+                    brightBlack: "#555753",
+                    brightRed: "#ef2929",
+                    brightGreen: "#8ae234",
+                    brightYellow: "#fce94f",
+                    brightBlue: "#729fcf",
+                    brightMagenta: "#ad7fa8",
+                    brightCyan: "#34e2e2",
+                    brightWhite: "#eeeeec"
+                }
+            });
             const fitAddon = new FitAddon.FitAddon();
             term.loadAddon(fitAddon);
             term.open(termDiv);
@@ -633,7 +687,13 @@
                 if (ws.readyState === WebSocket.OPEN) ws.send(data);
             });
 
-            terminals[id] = { term, fitAddon, ws, containerId, scope };
+            const resizeObserver = new ResizeObserver(() => {
+                if (!terminals[id]) return;
+                if (termDiv.style.display !== 'none') fitTerm(id);
+            });
+            resizeObserver.observe(termDiv);
+
+            terminals[id] = { term, fitAddon, ws, containerId, scope, resizeObserver };
             activateTerminalTab(id);
             return id;
         }
@@ -681,6 +741,7 @@
 
             t.ws.close();
             t.term.dispose();
+            try { t.resizeObserver?.disconnect?.(); } catch { }
             document.getElementById(t.containerId).remove();
             document.getElementById('tab-btn-' + id).remove();
             delete terminals[id];
@@ -713,6 +774,28 @@
         // --- Chat Logic ---
         let chatHistory = [];
         let currentSessionId = null;
+        let chatAbortController = null;
+        let agentAbortController = null;
+
+        function setChatGenerating(isGenerating) {
+            const btn = document.getElementById('chat-stop-btn');
+            if (!btn) return;
+            btn.disabled = !isGenerating;
+        }
+
+        function setAgentGenerating(isGenerating) {
+            const btn = document.getElementById('agent-stop-btn');
+            if (!btn) return;
+            btn.disabled = !isGenerating;
+        }
+
+        function stopChatGeneration() {
+            if (chatAbortController) chatAbortController.abort();
+        }
+
+        function stopAgentGeneration() {
+            if (agentAbortController) agentAbortController.abort();
+        }
 
         async function startNewChat() {
             currentSessionId = null;
@@ -765,6 +848,7 @@
             const input = document.getElementById('chat-input');
             const message = input.value.trim();
             if (!message) return;
+            if (chatAbortController) chatAbortController.abort();
 
             addMessageToUI('user', message);
             chatHistory.push({ role: 'user', content: message });
@@ -790,10 +874,13 @@
             let aiContent = '';
 
             try {
+                chatAbortController = new AbortController();
+                setChatGenerating(true);
                 const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ messages: chatHistory, apiKey, baseUrl, model })
+                    body: JSON.stringify({ messages: chatHistory, apiKey, baseUrl, model }),
+                    signal: chatAbortController.signal
                 });
 
                 const reader = res.body.getReader();
@@ -814,7 +901,14 @@
                 if (currentSessionId) await supabase.from('chat_messages').insert({ session_id: currentSessionId, role: 'assistant', content: aiContent });
 
             } catch (error) {
-                aiMsgEl.textContent = "Error: " + error.message;
+                if (error?.name === 'AbortError') {
+                    aiMsgEl.textContent = aiContent ? aiContent : "[stopped]";
+                } else {
+                    aiMsgEl.textContent = "Error: " + error.message;
+                }
+            } finally {
+                setChatGenerating(false);
+                chatAbortController = null;
             }
         }
 
@@ -844,6 +938,7 @@
             const input = document.getElementById('agent-chat-input');
             const message = (input.value || '').trim();
             if (!message) return;
+            if (agentAbortController) agentAbortController.abort();
 
             addAgentMessageToUI('user', message);
             agentChatHistory.push({ role: 'user', content: message });
@@ -857,10 +952,13 @@
             const aiMsgEl = addAgentMessageToUI('assistant', '...');
             let aiContent = '';
             try {
+                agentAbortController = new AbortController();
+                setAgentGenerating(true);
                 const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ messages: agentChatHistory, apiKey, baseUrl, model })
+                    body: JSON.stringify({ messages: agentChatHistory, apiKey, baseUrl, model }),
+                    signal: agentAbortController.signal
                 });
 
                 const reader = res.body.getReader();
@@ -878,7 +976,14 @@
                 renderMarkdownInto(aiMsgEl, aiContent);
                 agentChatHistory.push({ role: 'assistant', content: aiContent });
             } catch (error) {
-                aiMsgEl.textContent = "Error: " + error.message;
+                if (error?.name === 'AbortError') {
+                    aiMsgEl.textContent = aiContent ? aiContent : "[stopped]";
+                } else {
+                    aiMsgEl.textContent = "Error: " + error.message;
+                }
+            } finally {
+                setAgentGenerating(false);
+                agentAbortController = null;
             }
         }
 
