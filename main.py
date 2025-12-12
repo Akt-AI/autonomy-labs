@@ -125,16 +125,29 @@ async def proxy_models(request: ModelsRequest):
 async def websocket_terminal(websocket: WebSocket):
     await websocket.accept()
     
-    # Create PTY
-    master_fd, slave_fd = pty.openpty()
+    # Create PTY (required for an interactive shell). If the runtime has no PTY
+    # devices (e.g., /dev/pts not mounted / exhausted), fail gracefully.
+    try:
+        master_fd, slave_fd = pty.openpty()
+    except OSError as e:
+        await websocket.send_text(
+            "\r\n[terminal unavailable: PTY allocation failed]\r\n"
+            f"{type(e).__name__}: {e}\r\n"
+        )
+        await websocket.close()
+        return
     
     # Start shell
+    env = os.environ.copy()
+    env.setdefault("TERM", "xterm-256color")
+    env.setdefault("COLORTERM", "truecolor")
     p = subprocess.Popen(
-        ["/bin/bash"],
+        ["/bin/bash", "-i"],
         preexec_fn=os.setsid,
         stdin=slave_fd,
         stdout=slave_fd,
         stderr=slave_fd,
+        env=env,
         close_fds=True
     )
     
@@ -182,4 +195,3 @@ async def websocket_terminal(websocket: WebSocket):
         write_task.cancel()
         p.terminate()
         os.close(master_fd)
-
