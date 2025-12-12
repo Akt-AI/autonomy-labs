@@ -160,6 +160,44 @@
                         #0b1220;
         }
 
+        .attachment-strip {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .attachment-thumb {
+            width: 88px;
+            height: 64px;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            background: rgba(15, 23, 42, 0.35);
+        }
+
+        .attachment-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .attachment-thumb button {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            width: 20px;
+            height: 20px;
+            border-radius: 999px;
+            border: 0;
+            background: rgba(15, 23, 42, 0.75);
+            color: #e5e7eb;
+            cursor: pointer;
+            line-height: 20px;
+            font-size: 12px;
+        }
+
         .chat-message {
             max-width: 80%;
             padding: 10px;
@@ -360,12 +398,24 @@
 
                 <!-- Input -->
                 <div class="p-3 bg-gray-800 border-t border-gray-700 shrink-0">
-                    <div class="flex space-x-2 max-w-4xl mx-auto">
+                    <div id="chat-attachments" class="max-w-4xl mx-auto mb-2 hidden"></div>
+                    <div class="flex space-x-2 max-w-4xl mx-auto items-end">
                         <textarea id="chat-input" rows="1"
                             class="flex-grow bg-gray-700 p-3 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-32"
                             placeholder="Message..."
                             oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
                             onkeydown="handleEnter(event)"></textarea>
+                        <input id="chat-file-input" type="file" accept="image/*" multiple class="hidden" />
+                        <button onclick="document.getElementById('chat-file-input').click()"
+                            class="bg-gray-700 px-3 py-3 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
+                            title="Attach images">
+                            📎
+                        </button>
+                        <button onclick="captureScreenshotToChat()"
+                            class="bg-gray-700 px-3 py-3 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
+                            title="Take screenshot">
+                            ⧉
+                        </button>
                         <button id="chat-stop-btn" onclick="stopChatGeneration()" disabled
                             class="bg-gray-600 px-3 rounded-lg hover:bg-gray-700 font-bold transition flex items-center disabled:opacity-40 disabled:cursor-not-allowed"
                             title="Stop generating">
@@ -431,12 +481,24 @@
                         <div id="agent-chat-history" class="h-full p-4 overflow-y-auto space-y-4"></div>
                     </div>
                     <div class="p-3 bg-gray-800 border-t border-gray-700 shrink-0">
-                        <div class="flex space-x-2">
+                        <div id="agent-attachments" class="mb-2 hidden"></div>
+                        <div class="flex space-x-2 items-end">
                             <textarea id="agent-chat-input" rows="1"
                                 class="flex-grow bg-gray-700 p-3 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-32"
                                 placeholder="Ask agent..."
                                 oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
                                 onkeydown="handleAgentEnter(event)"></textarea>
+                            <input id="agent-file-input" type="file" accept="image/*" multiple class="hidden" />
+                            <button onclick="document.getElementById('agent-file-input').click()"
+                                class="bg-gray-700 px-3 py-3 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
+                                title="Attach images">
+                                📎
+                            </button>
+                            <button onclick="captureScreenshotToAgent()"
+                                class="bg-gray-700 px-3 py-3 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
+                                title="Take screenshot">
+                                ⧉
+                            </button>
                             <button id="agent-stop-btn" onclick="stopAgentGeneration()" disabled
                                 class="bg-gray-600 px-3 rounded-lg hover:bg-gray-700 font-bold transition flex items-center disabled:opacity-40 disabled:cursor-not-allowed"
                                 title="Stop generating">
@@ -668,6 +730,59 @@
 
                 initProviderPresets();
                 initAgentSplitPane();
+
+                // Multi-modal attachments
+                const chatFile = document.getElementById('chat-file-input');
+                const agentFile = document.getElementById('agent-file-input');
+                if (chatFile) {
+                    chatFile.addEventListener('change', (e) => {
+                        addAttachmentsFromFiles(e.target.files, 'chat');
+                        chatFile.value = '';
+                    });
+                }
+                if (agentFile) {
+                    agentFile.addEventListener('change', (e) => {
+                        addAttachmentsFromFiles(e.target.files, 'agent');
+                        agentFile.value = '';
+                    });
+                }
+
+                const chatInput = document.getElementById('chat-input');
+                if (chatInput) {
+                    chatInput.addEventListener('paste', (e) => {
+                        const items = e.clipboardData?.items || [];
+                        const files = [];
+                        for (const it of items) {
+                            if (it.kind === 'file') {
+                                const f = it.getAsFile();
+                                if (f && f.type && f.type.startsWith('image/')) files.push(f);
+                            }
+                        }
+                        if (files.length) {
+                            addAttachmentsFromFiles(files, 'chat');
+                            e.preventDefault();
+                        }
+                    });
+                }
+
+                const agentInput = document.getElementById('agent-chat-input');
+                if (agentInput) {
+                    agentInput.addEventListener('paste', (e) => {
+                        const items = e.clipboardData?.items || [];
+                        const files = [];
+                        for (const it of items) {
+                            if (it.kind === 'file') {
+                                const f = it.getAsFile();
+                                if (f && f.type && f.type.startsWith('image/')) files.push(f);
+                            }
+                        }
+                        if (files.length) {
+                            addAttachmentsFromFiles(files, 'agent');
+                            e.preventDefault();
+                        }
+                    });
+                }
+
                 // Apply defaults if fields are empty
                 if (config.default_base_url && !document.getElementById('chat-base-url').value) {
                     document.getElementById('chat-base-url').value = config.default_base_url;
@@ -911,6 +1026,8 @@
         let currentSessionId = null;
         let chatAbortController = null;
         let agentAbortController = null;
+        let chatImageAttachments = []; // [{ dataUrl, mime }]
+        let agentImageAttachments = []; // [{ dataUrl, mime }]
 
         function setChatGenerating(isGenerating) {
             const btn = document.getElementById('chat-stop-btn');
@@ -930,6 +1047,116 @@
 
         function stopAgentGeneration() {
             if (agentAbortController) agentAbortController.abort();
+        }
+
+        function guessMimeFromDataUrl(dataUrl) {
+            const m = /^data:([^;]+);base64,/.exec(dataUrl || '');
+            return m ? m[1] : 'image/png';
+        }
+
+        function renderAttachmentStrip(containerId, attachments, onRemove) {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            if (!attachments.length) {
+                el.classList.add('hidden');
+                el.innerHTML = '';
+                return;
+            }
+            el.classList.remove('hidden');
+            el.className = ('attachment-strip ' + (el.className || '')).replace(/\s+/g, ' ').trim();
+            el.innerHTML = '';
+            attachments.forEach((a, idx) => {
+                const wrap = document.createElement('div');
+                wrap.className = 'attachment-thumb';
+                wrap.innerHTML = `<img alt="attachment" src="${a.dataUrl}">`;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.title = 'Remove';
+                btn.textContent = '×';
+                btn.onclick = () => onRemove(idx);
+                wrap.appendChild(btn);
+                el.appendChild(wrap);
+            });
+        }
+
+        function renderChatAttachments() {
+            renderAttachmentStrip('chat-attachments', chatImageAttachments, (i) => {
+                chatImageAttachments.splice(i, 1);
+                renderChatAttachments();
+            });
+        }
+
+        function renderAgentAttachments() {
+            renderAttachmentStrip('agent-attachments', agentImageAttachments, (i) => {
+                agentImageAttachments.splice(i, 1);
+                renderAgentAttachments();
+            });
+        }
+
+        function addAttachmentsFromFiles(files, target) {
+            const list = Array.from(files || []).filter(f => f && f.type && f.type.startsWith('image/'));
+            if (!list.length) return;
+            list.forEach((file) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const dataUrl = String(reader.result || '');
+                    const entry = { dataUrl, mime: file.type || guessMimeFromDataUrl(dataUrl) };
+                    if (target === 'chat') {
+                        chatImageAttachments.push(entry);
+                        renderChatAttachments();
+                    } else {
+                        agentImageAttachments.push(entry);
+                        renderAgentAttachments();
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function captureScreenshotDataUrl() {
+            if (!navigator.mediaDevices?.getDisplayMedia) {
+                throw new Error('Screen capture not supported in this browser.');
+            }
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+            try {
+                const track = stream.getVideoTracks()[0];
+                const settings = track.getSettings?.() || {};
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.muted = true;
+                await video.play();
+
+                const width = settings.width || video.videoWidth || 1280;
+                const height = settings.height || video.videoHeight || 720;
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, width, height);
+                return canvas.toDataURL('image/png');
+            } finally {
+                stream.getTracks().forEach(t => t.stop());
+            }
+        }
+
+        async function captureScreenshotToChat() {
+            try {
+                const dataUrl = await captureScreenshotDataUrl();
+                chatImageAttachments.push({ dataUrl, mime: 'image/png' });
+                renderChatAttachments();
+            } catch (e) {
+                alert(e?.message || e);
+            }
+        }
+
+        async function captureScreenshotToAgent() {
+            try {
+                const dataUrl = await captureScreenshotDataUrl();
+                agentImageAttachments.push({ dataUrl, mime: 'image/png' });
+                renderAgentAttachments();
+            } catch (e) {
+                alert(e?.message || e);
+            }
         }
 
         async function startNewChat() {
@@ -1022,12 +1249,34 @@
         async function sendMessage() {
             const input = document.getElementById('chat-input');
             const message = input.value.trim();
-            if (!message) return;
+            if (!message && chatImageAttachments.length === 0) return;
             if (chatAbortController) chatAbortController.abort();
 
-            addMessageToUI('user', message);
-            chatHistory.push({ role: 'user', content: message });
+            // Build multimodal user message (text + optional images)
+            const parts = [];
+            if (message) parts.push({ type: 'text', text: message });
+            chatImageAttachments.forEach((a) => {
+                parts.push({ type: 'image_url', image_url: { url: a.dataUrl } });
+            });
+            addMessageToUI('user', message || (chatImageAttachments.length ? '[image]' : ''));
+            if (chatImageAttachments.length) {
+                const imgWrap = document.createElement('div');
+                imgWrap.className = 'attachment-strip mt-2';
+                chatImageAttachments.forEach((a) => {
+                    const img = document.createElement('img');
+                    img.src = a.dataUrl;
+                    img.alt = 'attachment';
+                    img.className = 'attachment-thumb';
+                    img.style.width = '120px';
+                    img.style.height = '86px';
+                    imgWrap.appendChild(img);
+                });
+                document.getElementById('chat-history').lastChild.appendChild(imgWrap);
+            }
+            chatHistory.push({ role: 'user', content: parts.length === 1 && parts[0].type === 'text' ? parts[0].text : parts });
             input.value = '';
+            chatImageAttachments = [];
+            renderChatAttachments();
             scrollToBottom();
 
             // Save to DB
@@ -1039,7 +1288,7 @@
                     loadChatHistoryList();
                 }
             }
-            if (currentSessionId) await supabase.from('chat_messages').insert({ session_id: currentSessionId, role: 'user', content: message });
+            if (currentSessionId) await supabase.from('chat_messages').insert({ session_id: currentSessionId, role: 'user', content: message || (parts.length ? '[attachment]' : '') });
 
             // AI Request
             const apiKey = document.getElementById('chat-api-key').value;
@@ -1112,12 +1361,34 @@
         async function sendAgentMessage() {
             const input = document.getElementById('agent-chat-input');
             const message = (input.value || '').trim();
-            if (!message) return;
+            if (!message && agentImageAttachments.length === 0) return;
             if (agentAbortController) agentAbortController.abort();
 
-            addAgentMessageToUI('user', message);
-            agentChatHistory.push({ role: 'user', content: message });
+            const parts = [];
+            if (message) parts.push({ type: 'text', text: message });
+            agentImageAttachments.forEach((a) => {
+                parts.push({ type: 'image_url', image_url: { url: a.dataUrl } });
+            });
+
+            addAgentMessageToUI('user', message || (agentImageAttachments.length ? '[image]' : ''));
+            if (agentImageAttachments.length) {
+                const imgWrap = document.createElement('div');
+                imgWrap.className = 'attachment-strip mt-2';
+                agentImageAttachments.forEach((a) => {
+                    const img = document.createElement('img');
+                    img.src = a.dataUrl;
+                    img.alt = 'attachment';
+                    img.className = 'attachment-thumb';
+                    img.style.width = '120px';
+                    img.style.height = '86px';
+                    imgWrap.appendChild(img);
+                });
+                document.getElementById('agent-chat-history').lastChild.appendChild(imgWrap);
+            }
+            agentChatHistory.push({ role: 'user', content: parts.length === 1 && parts[0].type === 'text' ? parts[0].text : parts });
             input.value = '';
+            agentImageAttachments = [];
+            renderAgentAttachments();
             scrollAgentToBottom();
 
             const apiKey = document.getElementById('chat-api-key').value;

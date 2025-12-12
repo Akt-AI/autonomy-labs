@@ -6,7 +6,7 @@ import struct
 import fcntl
 import termios
 import asyncio
-from typing import List, Optional
+from typing import Any, List, Optional, Union
 from pydantic import BaseModel
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -51,7 +51,8 @@ async def health_check():
 
 class ChatMessage(BaseModel):
     role: str
-    content: str
+    # OpenAI-compatible: content can be plain text or an array of multimodal parts.
+    content: Union[str, List[Any]]
 
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
