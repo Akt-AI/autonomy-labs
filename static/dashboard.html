@@ -404,9 +404,13 @@
                                 class="px-2 py-1 text-xs rounded-md text-gray-200 hover:bg-white/10 transition">Autonomous</button>
                         </div>
                         <button id="chat-terminal-toggle" onclick="toggleAgentTerminalCollapsed()"
-                            class="hidden md:inline-flex px-2 py-1 text-xs rounded-md text-gray-200 hover:bg-white/10 transition"
-                            title="Toggle autonomous terminal">
-                            Terminal
+                            class="hidden md:inline-flex p-2 rounded-md text-gray-200 hover:bg-white/10 transition"
+                            title="Toggle autonomous terminal" aria-label="Toggle autonomous terminal">
+                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5h16v14H4V5z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 9l3 3-3 3" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 15h6" />
+                            </svg>
                         </button>
                         <button onclick="toggleSettings()"
                             class="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-700 transition">
@@ -509,7 +513,12 @@
 
                 <div id="chat-standard" class="flex-grow flex flex-col min-h-0">
                     <!-- Messages -->
-                    <div id="chat-history" class="flex-grow p-4 overflow-y-auto space-y-4 scroll-smooth"></div>
+                    <div id="chat-history" class="flex-grow p-4 overflow-y-auto space-y-4 scroll-smooth">
+                        <div id="chat-empty-state" class="text-center text-gray-500 mt-10">
+                            <div class="text-lg font-semibold text-gray-300">Start a conversation</div>
+                            <div class="text-sm text-gray-500 mt-1">Pick a provider in Settings, then send a message.</div>
+                        </div>
+                    </div>
 
                     <!-- Input -->
                     <div class="p-3 bg-gray-800 border-t border-gray-700 shrink-0">
@@ -548,11 +557,16 @@
                 </div>
 
                 <!-- Autonomous mode embedded in Chat view -->
-                <div id="chat-autonomous" class="hidden flex-grow min-h-0">
+                <div id="chat-autonomous" class="hidden flex-grow min-h-0 flex flex-col">
                     <div id="agent-split-root" class="split-root">
                         <div id="agent-pane-chat" class="split-pane min-h-0 flex flex-col border-r border-gray-700 agent-pane-surface">
                             <div class="flex-grow min-h-0 overflow-hidden">
-                                <div id="agent-chat-history" class="h-full p-4 overflow-y-auto space-y-4"></div>
+                                <div id="agent-chat-history" class="h-full p-4 overflow-y-auto space-y-4">
+                                    <div id="agent-empty-state" class="text-center text-gray-500 mt-10">
+                                        <div class="text-lg font-semibold text-gray-300">Autonomous mode</div>
+                                        <div class="text-sm text-gray-500 mt-1">Ask the agent, then use “Run” on code blocks.</div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="p-3 bg-gray-800 border-t border-gray-700 shrink-0">
                                 <div id="agent-attachments" class="mb-2 hidden"></div>
@@ -1553,7 +1567,10 @@
             const div = document.createElement('div');
             div.className = `chat-message ${role === 'user' ? 'user-message self-end' : 'ai-message self-start'} max-w-[85%] p-3 rounded-xl my-2 prose prose-invert break-words text-sm md:text-base shadow-sm`;
             renderMarkdownInto(div, content);
-            document.getElementById('chat-history').appendChild(div);
+            const container = document.getElementById('chat-history');
+            const empty = document.getElementById('chat-empty-state');
+            if (empty) empty.remove();
+            container.appendChild(div);
             return div;
         }
 
@@ -1657,7 +1674,10 @@
             const div = document.createElement('div');
             div.className = `chat-message ${role === 'user' ? 'user-message self-end' : 'ai-message self-start'} max-w-[85%] p-3 rounded-xl my-2 prose prose-invert break-words text-sm md:text-base shadow-sm`;
             renderMarkdownInto(div, content);
-            document.getElementById('agent-chat-history').appendChild(div);
+            const container = document.getElementById('agent-chat-history');
+            const empty = document.getElementById('agent-empty-state');
+            if (empty) empty.remove();
+            container.appendChild(div);
             return div;
         }
 
