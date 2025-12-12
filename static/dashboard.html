@@ -283,7 +283,7 @@
                 <button onclick="switchMode('chat')"
                     class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition" id="nav-chat">Chat</button>
                 <button onclick="switchMode('terminal')"
-                    class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition"
+                    class="p-2 rounded hover:bg-gray-700 text-gray-300 transition inline-flex items-center justify-center"
                     id="nav-terminal" title="Terminal" aria-label="Terminal">
                     <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5h16v14H4V5z" />
@@ -523,30 +523,30 @@
                     <!-- Input -->
                     <div class="p-3 bg-gray-800 border-t border-gray-700 shrink-0">
                         <div id="chat-attachments" class="max-w-4xl mx-auto mb-2 hidden"></div>
-                        <div class="flex space-x-2 max-w-4xl mx-auto items-end">
+                        <div class="flex space-x-2 max-w-4xl mx-auto items-center">
                             <textarea id="chat-input" rows="1"
-                                class="flex-grow bg-gray-700 p-3 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-32"
+                                class="flex-grow bg-gray-700 px-3 py-2 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-32"
                                 placeholder="Message..."
                                 oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
                                 onkeydown="handleEnter(event)"></textarea>
                             <input id="chat-file-input" type="file" accept="image/*" multiple class="hidden" />
                             <button onclick="document.getElementById('chat-file-input').click()"
-                                class="bg-gray-700 px-3 py-3 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
+                                class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"
                                 title="Attach images">
                                 📎
                             </button>
                             <button onclick="captureScreenshotToChat()"
-                                class="bg-gray-700 px-3 py-3 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
+                                class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"
                                 title="Take screenshot">
                                 ⧉
                             </button>
                             <button id="chat-stop-btn" onclick="stopChatGeneration()" disabled
-                                class="bg-gray-600 px-3 rounded-lg hover:bg-gray-700 font-bold transition flex items-center disabled:opacity-40 disabled:cursor-not-allowed"
+                                class="bg-gray-600 h-10 px-3 rounded-lg hover:bg-gray-700 font-bold transition inline-flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
                                 title="Stop generating">
                                 Stop
                             </button>
                             <button onclick="sendMessage()"
-                                class="bg-blue-600 px-4 rounded-lg hover:bg-blue-700 font-bold transition flex items-center">
+                                class="bg-blue-600 h-10 w-10 rounded-lg hover:bg-blue-700 font-bold transition inline-flex items-center justify-center">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
