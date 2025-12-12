@@ -393,11 +393,68 @@
 
         function preprocessMathDelimiters(text) {
             if (!text) return text;
-            return text
+            const withStandardDelimiters = text
                 .replace(/\\\[/g, '$$')
                 .replace(/\\\]/g, '$$')
                 .replace(/\\\(/g, '$')
                 .replace(/\\\)/g, '$');
+
+            // Many LLMs emit LaTeX with double-escaped backslashes (e.g. "\\frac").
+            // KaTeX expects single backslashes inside math, so normalize inside $...$ / $$...$$
+            // while leaving code fences/inline code untouched.
+            return normalizeMathBackslashes(withStandardDelimiters);
+        }
+
+        function normalizeMathBackslashes(markdown) {
+            if (!markdown) return markdown;
+
+            const parts = [];
+            const fenceRe = /```[\s\S]*?```/g;
+            let last = 0;
+            let m;
+            while ((m = fenceRe.exec(markdown)) !== null) {
+                if (m.index > last) parts.push({ type: 'text', value: markdown.slice(last, m.index) });
+                parts.push({ type: 'codefence', value: m[0] });
+                last = m.index + m[0].length;
+            }
+            if (last < markdown.length) parts.push({ type: 'text', value: markdown.slice(last) });
+
+            return parts
+                .map((part) => {
+                    if (part.type !== 'text') return part.value;
+
+                    // Protect inline code spans.
+                    const segments = [];
+                    const inlineCodeRe = /`[^`]*`/g;
+                    let lastSeg = 0;
+                    let mi;
+                    while ((mi = inlineCodeRe.exec(part.value)) !== null) {
+                        if (mi.index > lastSeg) segments.push({ type: 'text', value: part.value.slice(lastSeg, mi.index) });
+                        segments.push({ type: 'inlinecode', value: mi[0] });
+                        lastSeg = mi.index + mi[0].length;
+                    }
+                    if (lastSeg < part.value.length) segments.push({ type: 'text', value: part.value.slice(lastSeg) });
+
+                    const fixInner = (inner) => inner.replace(/\\\\(?=[a-zA-Z\\{}_^])/g, '\\');
+
+                    return segments
+                        .map((seg) => {
+                            if (seg.type !== 'text') return seg.value;
+
+                            // Block math
+                            let out = seg.value.replace(/\$\$([\s\S]*?)\$\$/g, (_, inner) => `$$${fixInner(inner)}$$`);
+
+                            // Inline math (best-effort; only normalizes sequences that look like LaTeX commands)
+                            out = out.replace(/\$([^\n$]+?)\$/g, (_, inner) => {
+                                if (!/\\\\(?=[a-zA-Z\\{}_^])/.test(inner)) return `$${inner}$`;
+                                return `$${fixInner(inner)}$`;
+                            });
+
+                            return out;
+                        })
+                        .join('');
+                })
+                .join('');
         }
 
         function renderMathInMessage(containerEl) {

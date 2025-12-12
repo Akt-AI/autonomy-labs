@@ -27,31 +27,25 @@ ENV PATH="$NVM_DIR/versions/node/v24.12.0/bin:$PATH"
 RUN corepack enable pnpm
 
 # Shorten terminal hostname/prompt for interactive shells
-ENV HOSTNAME=sandbox
-RUN echo 'export PS1="\\u@sandbox:\\w\\$ "' >> /root/.bashrc
+RUN printf '%s\n' \
+    'export PROMPT_HOST_SHORT="${PROMPT_HOST_SHORT:-$(hostname | cut -c1-8)}"' \
+    'export PS1="\\u@${PROMPT_HOST_SHORT}:\\w\\$ "' \
+  >> /root/.bashrc
 
-# Install real CLI tools (network required at build time)
-RUN npm install -g @google/generative-ai-cli @anthropic-ai/claude-code \
+# Install CLI tools (network required at build time)
+RUN npm i -g @openai/codex \
+    && curl -fsSL https://claude.ai/install.sh | bash \
     && printf '%s\n' \
         '#!/usr/bin/env bash' \
         'set -euo pipefail' \
         '' \
-        '# Wrapper for Google Gemini/GenAI CLI (package name may change over time).' \
-        'for candidate in genai generative-ai gemini; do' \
-        '  if command -v \"$candidate\" >/dev/null 2>&1; then' \
-        '    exec \"$candidate\" \"$@\"' \
-        '  fi' \
-        'done' \
-        'echo \"Gemini CLI not found on PATH; package install may have changed.\" >&2' \
-        'exit 127' \
+        '# Using npx (no installation required)' \
+        'exec npx https://github.com/google-gemini/gemini-cli \"$@\"' \
       > /usr/local/bin/gemini-cli \
-    && chmod +x /usr/local/bin/gemini-cli \
-    && printf '%s\n' \
-        '#!/usr/bin/env bash' \
-        'echo \"codex: no official OpenAI CLI is installed in this image.\"' \
-        'echo \"Use the Codex CLI app or an OpenAI SDK instead.\"' \
-      > /usr/local/bin/codex \
-    && chmod +x /usr/local/bin/codex
+    && chmod +x /usr/local/bin/gemini-cli
+
+# claude install.sh typically drops binaries in ~/.local/bin
+ENV PATH="/root/.local/bin:$PATH"
 
 # Working directory
 WORKDIR /app
