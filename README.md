@@ -1,11 +1,11 @@
-# ---
-# title: Autonomy Labs Sandbox
-# emoji: 🚀
-# colorFrom: blue
-# colorTo: purple
-# sdk: docker
-# pinned: false
-# ---
+---
+title: Autonomy Labs Sandbox
+emoji: 🚀
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+---
 
 # Autonomy Labs Sandbox
 
