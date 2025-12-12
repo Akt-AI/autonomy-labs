@@ -1,3 +1,13 @@
+---
+title: Sandbox Agent Hub
+emoji: 🤖
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_file: main.py
+pinned: false
+---
+
 # Sandbox Agent Hub
 
 React-based control center for AI chat, terminal, embedded browser, and n8n/MCP agent workflows. Ships as a FastAPI backend with WebSocket terminal support and containerized tooling.
