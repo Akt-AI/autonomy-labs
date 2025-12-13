@@ -874,6 +874,7 @@
                             class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500" />
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
+                        <button onclick="aiWriteNotes()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded text-xs" title="Use AI to write in this note">@AI</button>
                         <button onclick="saveActiveNote()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-xs">Save</button>
                         <button onclick="renameActiveNote()" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded text-xs">Rename</button>
                         <button onclick="deleteActiveNote()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-xs">Delete</button>
@@ -2902,6 +2903,94 @@
                 setNotesStatus('Deleted');
             } catch (e) {
                 setNotesStatus(`Delete failed: ${e?.message || e}`);
+            }
+        }
+
+        let notesAiAbortController = null;
+
+        function getProviderInputs() {
+            return {
+                apiKey: document.getElementById('chat-api-key')?.value || '',
+                baseUrl: document.getElementById('chat-base-url')?.value || '',
+                model: document.getElementById('chat-model')?.value || 'gpt-3.5-turbo',
+            };
+        }
+
+        async function aiWriteNotes() {
+            const { title, editor } = getNotesInputs();
+            if (!editor) return;
+
+            const instruction = prompt('Ask AI to write/edit this note (it will insert at your cursor):');
+            if (!instruction) return;
+
+            const provider = getProviderInputs();
+            if (!provider.baseUrl) {
+                alert('Set Base URL in Settings first.');
+                return;
+            }
+
+            if (notesAiAbortController) notesAiAbortController.abort();
+            notesAiAbortController = new AbortController();
+
+            const currentTitle = title?.value || '(untitled)';
+            const currentContent = editor.value || '';
+            setNotesStatus('AI writing…');
+
+            const messages = [
+                {
+                    role: 'system',
+                    content: 'You are a helpful assistant writing concise, well-structured Markdown notes. Return Markdown only.'
+                },
+                {
+                    role: 'user',
+                    content:
+                        `Note title: ${currentTitle}\n\n` +
+                        `Current note:\n---\n${currentContent}\n---\n\n` +
+                        `Task: ${instruction}\n\n` +
+                        `Write the new content to insert at the cursor.`
+                }
+            ];
+
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages, apiKey: provider.apiKey, baseUrl: provider.baseUrl, model: provider.model }),
+                    signal: notesAiAbortController.signal
+                });
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let out = '';
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    out += decoder.decode(value);
+                }
+
+                const insertText = (out || '').trim();
+                if (!insertText) {
+                    setNotesStatus('AI returned empty output.');
+                    return;
+                }
+
+                const start = editor.selectionStart ?? editor.value.length;
+                const end = editor.selectionEnd ?? editor.value.length;
+                const before = editor.value.slice(0, start);
+                const after = editor.value.slice(end);
+                const spacerLeft = before && !before.endsWith('\n') ? '\n' : '';
+                const spacerRight = after && !insertText.endsWith('\n') ? '\n' : '';
+                editor.value = `${before}${spacerLeft}${insertText}${spacerRight}${after}`;
+                const cursor = (before + spacerLeft + insertText + spacerRight).length;
+                editor.selectionStart = editor.selectionEnd = cursor;
+                editor.dispatchEvent(new Event('input'));
+
+                setNotesStatus(`AI inserted (${new Date().toLocaleTimeString()})`);
+            } catch (e) {
+                if (e?.name === 'AbortError') setNotesStatus('AI canceled.');
+                else setNotesStatus(`AI failed: ${e?.message || e}`);
+            } finally {
+                notesAiAbortController = null;
             }
         }
 
