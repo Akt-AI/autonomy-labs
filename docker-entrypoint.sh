@@ -1,6 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+persist_codex_dir_if_possible() {
+  local persistent_root="/data"
+  local codex_home="${HOME}/.codex"
+  local persistent_codex="${persistent_root}/.codex"
+
+  if [[ ! -d "${persistent_root}" ]] || [[ ! -w "${persistent_root}" ]]; then
+    return 0
+  fi
+
+  mkdir -p "${persistent_codex}"
+  chmod 700 "${persistent_codex}" || true
+
+  if [[ -L "${codex_home}" ]]; then
+    return 0
+  fi
+
+  if [[ -d "${codex_home}" ]] && [[ -n "$(ls -A "${codex_home}" 2>/dev/null || true)" ]]; then
+    mkdir -p "${persistent_codex}"
+    cp -a "${codex_home}/." "${persistent_codex}/" 2>/dev/null || true
+    rm -rf "${codex_home}"
+  else
+    rm -rf "${codex_home}" 2>/dev/null || true
+  fi
+
+  ln -s "${persistent_codex}" "${codex_home}"
+  echo "[codex] Using persistent config dir: ${codex_home} -> ${persistent_codex}"
+}
+
 ensure_ssh_keypair() {
   local ssh_dir="${HOME}/.ssh"
   local key_path="${ssh_dir}/id_ed25519"
@@ -31,10 +59,10 @@ EOF
 }
 
 if command -v ssh-keygen >/dev/null 2>&1; then
+  persist_codex_dir_if_possible
   ensure_ssh_keypair
 else
   echo "[git ssh] ssh-keygen not found; install openssh-client to enable SSH key generation." >&2
 fi
 
 exec "$@"
-
