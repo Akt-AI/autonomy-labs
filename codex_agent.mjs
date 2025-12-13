@@ -21,6 +21,8 @@ async function main() {
   const sandboxMode = payload.sandboxMode || "read-only";
   const approvalPolicy = payload.approvalPolicy || "never";
   const workingDirectory = payload.workingDirectory || process.cwd();
+  const modelReasoningEffort =
+    payload.modelReasoningEffort || "minimal";
 
   const apiKey =
     (typeof payload.apiKey === "string" && payload.apiKey) ||
@@ -45,6 +47,7 @@ async function main() {
         model,
         sandboxMode,
         approvalPolicy,
+        modelReasoningEffort,
         workingDirectory,
         skipGitRepoCheck: true,
       })
@@ -52,6 +55,7 @@ async function main() {
         model,
         sandboxMode,
         approvalPolicy,
+        modelReasoningEffort,
         workingDirectory,
         skipGitRepoCheck: true,
       });

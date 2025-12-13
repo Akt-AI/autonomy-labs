@@ -133,6 +133,7 @@ class CodexRequest(BaseModel):
     approvalPolicy: Optional[str] = "never"
     apiKey: Optional[str] = None
     baseUrl: Optional[str] = None
+    modelReasoningEffort: Optional[str] = "minimal"
 
 @app.post("/api/codex")
 async def codex_agent(request: CodexRequest):
@@ -154,6 +155,7 @@ async def codex_agent(request: CodexRequest):
         "model": request.model,
         "sandboxMode": request.sandboxMode,
         "approvalPolicy": request.approvalPolicy,
+        "modelReasoningEffort": request.modelReasoningEffort,
         "workingDirectory": os.path.dirname(__file__),
     }
 
