@@ -140,6 +140,22 @@
             position: relative;
         }
 
+        /* Terminal split layouts (Terminal tab only) */
+        .terminal-grid {
+            display: grid;
+            gap: 10px;
+            padding: 10px;
+        }
+        .terminal-grid.single { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+        .terminal-grid.vsplit { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }
+        .terminal-grid.hsplit { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+        .terminal-grid.quad { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+        .terminal-pane {
+            position: relative;
+            min-height: 0;
+            min-width: 0;
+        }
+
         /* Agent split panes (chat | terminal) */
         .split-root {
             display: flex;
@@ -655,15 +671,32 @@
                 <div id="terminal-tabs" class="flex">
                     <!-- Tab Items will be injected here -->
                 </div>
+                <div class="ml-auto flex items-center">
+                    <button onclick="setTerminalLayout('single')" id="layout-single"
+                        class="px-2 py-2 text-gray-400 hover:text-white hover:bg-gray-700 transition"
+                        title="Single pane">▢</button>
+                    <button onclick="setTerminalLayout('vsplit')" id="layout-vsplit"
+                        class="px-2 py-2 text-gray-400 hover:text-white hover:bg-gray-700 transition"
+                        title="Vertical split">▥</button>
+                    <button onclick="setTerminalLayout('hsplit')" id="layout-hsplit"
+                        class="px-2 py-2 text-gray-400 hover:text-white hover:bg-gray-700 transition"
+                        title="Horizontal split">▤</button>
+                    <button onclick="setTerminalLayout('quad')" id="layout-quad"
+                        class="px-2 py-2 text-gray-400 hover:text-white hover:bg-gray-700 transition"
+                        title="2x2 grid">▦</button>
                 <button onclick="createTerminalTab()"
                     class="px-3 py-2 text-gray-400 hover:text-white hover:bg-gray-700 transition font-bold"
                     title="New Terminal">
                     +
                 </button>
+                </div>
             </div>
             <!-- Terminal Containers Area -->
-            <div id="terminals-container" class="flex-grow relative w-full h-full">
-                <!-- Individual terminal viewports go here -->
+            <div id="terminals-container" class="flex-grow w-full h-full terminal-grid single">
+                <div id="terminal-pane-1" class="terminal-pane"></div>
+                <div id="terminal-pane-2" class="terminal-pane hidden"></div>
+                <div id="terminal-pane-3" class="terminal-pane hidden"></div>
+                <div id="terminal-pane-4" class="terminal-pane hidden"></div>
             </div>
         </div>
 
@@ -990,6 +1023,7 @@
                 loadProviders();
                 await loadChatHistoryList();
                 createTerminalTab(); // Init first tab
+                applyTerminalLayout();
 
             } catch (error) { console.error(error); }
         }
@@ -1028,7 +1062,7 @@
 
             const termDiv = document.createElement('div');
             termDiv.id = containerId;
-            termDiv.className = scope === 'agent' ? "absolute inset-0" : "absolute inset-0 terminal-resizable";
+            termDiv.className = scope === 'agent' ? "absolute inset-0" : "absolute inset-0";
             termDiv.style.display = 'none';
             containersEl.appendChild(termDiv);
 
@@ -1081,7 +1115,11 @@
             resizeObserver.observe(termDiv);
 
             terminals[id] = { term, fitAddon, ws, containerId, scope, resizeObserver };
-            activateTerminalTab(id);
+            if (scope === 'main') {
+                applyTerminalLayout();
+            } else {
+                activateTerminalTab(id);
+            }
             return id;
         }
 
@@ -1089,6 +1127,17 @@
             const t = terminals[id];
             if (!t) return;
             const scope = t.scope || 'main';
+
+            if (scope === 'main') {
+                // In split layouts, we can show multiple terminals simultaneously.
+                // Keep activeTerminalId for focus and resizing only.
+                activeTerminalId = id;
+                setTimeout(() => {
+                    fitTerm(id);
+                    terminals[id].term.focus();
+                }, 50);
+                return;
+            }
 
             Object.keys(terminals).forEach((tid) => {
                 const termInfo = terminals[tid];
@@ -1137,8 +1186,88 @@
                 activateTerminalTab(remainingInScope[remainingInScope.length - 1]);
             }
             if (scope === 'main' && activeTerminalId === id) {
-                activateTerminalTab(remainingInScope[remainingInScope.length - 1]);
+                activeTerminalId = remainingInScope[remainingInScope.length - 1];
+                applyTerminalLayout();
             }
+        }
+
+        function getTerminalLayout() {
+            return localStorage.getItem('terminal_layout_v1') || 'single';
+        }
+
+        function setTerminalLayout(layout) {
+            const allowed = new Set(['single', 'vsplit', 'hsplit', 'quad']);
+            const next = allowed.has(layout) ? layout : 'single';
+            localStorage.setItem('terminal_layout_v1', next);
+            applyTerminalLayout();
+        }
+
+        function applyTerminalLayout() {
+            const container = document.getElementById('terminals-container');
+            if (!container) return;
+            const layout = getTerminalLayout();
+
+            container.classList.remove('single', 'vsplit', 'hsplit', 'quad');
+            container.classList.add(layout);
+
+            // Highlight buttons
+            ['single', 'vsplit', 'hsplit', 'quad'].forEach((k) => {
+                const b = document.getElementById(`layout-${k}`);
+                if (!b) return;
+                b.classList.toggle('text-white', k === layout);
+                b.classList.toggle('bg-gray-700', k === layout);
+            });
+
+            const panes = [
+                document.getElementById('terminal-pane-1'),
+                document.getElementById('terminal-pane-2'),
+                document.getElementById('terminal-pane-3'),
+                document.getElementById('terminal-pane-4'),
+            ].filter(Boolean);
+
+            const maxPanes = layout === 'quad' ? 4 : (layout === 'single' ? 1 : 2);
+
+            panes.forEach((p, idx) => p.classList.toggle('hidden', idx >= maxPanes));
+
+            const ids = Object.keys(terminals)
+                .filter((tid) => (terminals[tid].scope || 'main') === 'main')
+                .sort((a, b) => {
+                    // keep creation order by terminalCount embedded in id suffix
+                    const an = Number(a.split('-').pop() || 0);
+                    const bn = Number(b.split('-').pop() || 0);
+                    return an - bn;
+                });
+
+            // Ensure we have an active terminal
+            if (!activeTerminalId || !terminals[activeTerminalId] || terminals[activeTerminalId].scope !== 'main') {
+                activeTerminalId = ids[ids.length - 1] || null;
+            }
+
+            // Choose which terminals to show: active terminal first, then others newest-first
+            const ordered = [];
+            if (activeTerminalId) ordered.push(activeTerminalId);
+            ids.slice().reverse().forEach((tid) => {
+                if (ordered.includes(tid)) return;
+                ordered.push(tid);
+            });
+            const visibleIds = ordered.slice(0, maxPanes);
+
+            // Move terminal DOM nodes into panes and show/hide
+            visibleIds.forEach((tid, idx) => {
+                const termDiv = document.getElementById(terminals[tid].containerId);
+                const pane = panes[idx];
+                if (!termDiv || !pane) return;
+                if (termDiv.parentElement !== pane) pane.appendChild(termDiv);
+                termDiv.style.display = 'block';
+            });
+            ids.forEach((tid) => {
+                if (visibleIds.includes(tid)) return;
+                const termDiv = document.getElementById(terminals[tid].containerId);
+                if (termDiv) termDiv.style.display = 'none';
+            });
+
+            // Fit all visible terminals
+            setTimeout(() => visibleIds.forEach((tid) => fitTerm(tid)), 0);
         }
 
         function fitTerm(id) {
