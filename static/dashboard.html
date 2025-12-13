@@ -93,6 +93,11 @@
             color: rgba(2, 6, 23, 0.9);
         }
 
+        /* Notes preview readability in light mode */
+        [data-theme="light"] #notes-preview {
+            color: rgba(2, 6, 23, 0.92);
+        }
+
         /* Dashboard cards/surfaces in light mode (Tailwind arbitrary opacity classes) */
         [data-theme="light"] .bg-gray-800\\/60 { background-color: rgba(255, 255, 255, 0.92) !important; }
         [data-theme="light"] .bg-gray-900\\/40 { background-color: rgba(15, 23, 42, 0.03) !important; }
@@ -1120,6 +1125,12 @@
             localStorage.setItem('theme_v1', t);
             const icon = document.getElementById('theme-icon');
             if (icon) icon.textContent = t === 'light' ? '☀' : '☾';
+
+            // Notes preview should not use prose-invert in light mode (it can make text appear missing).
+            const notesPreview = document.getElementById('notes-preview');
+            if (notesPreview) {
+                notesPreview.classList.toggle('prose-invert', t !== 'light');
+            }
         }
 
         function toggleTheme() {
