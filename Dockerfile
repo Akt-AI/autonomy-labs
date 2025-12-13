@@ -40,6 +40,7 @@ RUN printf '%s\n' \
 
 # Install CLI tools (network required at build time)
 RUN npm i -g @openai/codex @google/gemini-cli \
+  && npm i -g @modelcontextprotocol/server-filesystem \
   && curl -fsSL https://claude.ai/install.sh | bash \
   && true
 

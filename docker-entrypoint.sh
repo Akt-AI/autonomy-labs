@@ -65,4 +65,22 @@ else
   echo "[git ssh] ssh-keygen not found; install openssh-client to enable SSH key generation." >&2
 fi
 
+ensure_filesystem_mcp() {
+  if ! command -v codex >/dev/null 2>&1; then
+    return 0
+  fi
+  if ! command -v mcp-server-filesystem >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if codex mcp list 2>/dev/null | awk '{print $1}' | grep -qx "filesystem"; then
+    return 0
+  fi
+
+  # Allow Codex to read (and if sandbox allows, write) within /app via filesystem MCP.
+  codex mcp add filesystem -- mcp-server-filesystem /app >/dev/null 2>&1 || true
+}
+
+ensure_filesystem_mcp
+
 exec "$@"

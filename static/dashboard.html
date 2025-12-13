@@ -620,7 +620,7 @@
                                 <div>
                                     <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Model</label>
                                     <div class="flex gap-1">
-                                        <input type="text" id="chat-model" value="gpt-3.5-turbo"
+                                        <input type="text" id="chat-model"
                                             class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500"
                                             list="model-list">
                                         <datalist id="model-list"></datalist>
@@ -1332,6 +1332,14 @@
                 if (config.default_model && !document.getElementById('chat-model').value) {
                     document.getElementById('chat-model').value = config.default_model;
                 }
+
+                // Populate model picker from the configured base URL
+                const baseUrlEl = document.getElementById('chat-base-url');
+                if (baseUrlEl) {
+                    baseUrlEl.addEventListener('change', () => fetchModels().catch(() => { }));
+                    baseUrlEl.addEventListener('blur', () => fetchModels().catch(() => { }));
+                }
+                fetchModels().catch(() => { });
 
                 loadProviders();
                 await initNotes();
@@ -2588,26 +2596,38 @@
         //  Actually, the replacement block ended at `// ... [Include Chat/Provider JS here]`. 
         //  So I must re-add them now.)
 
-        async function fetchModels() { /* ... same as before ... */
-            const apiKey = document.getElementById('chat-api-key').value;
-            const baseUrl = document.getElementById('chat-base-url').value;
-            if (!baseUrl) return alert("Base URL required");
+        async function fetchModels({ quiet = true } = {}) {
+            const apiKey = document.getElementById('chat-api-key')?.value || '';
+            const baseUrl = document.getElementById('chat-base-url')?.value || '';
+            if (!baseUrl) return;
 
-            try {
-                const res = await fetch('/api/proxy/models', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey, baseUrl }) });
-                const data = await res.json();
-                const list = document.getElementById('model-list');
-                list.innerHTML = '';
-                const models = data.data || data;
-                if (Array.isArray(models)) {
-                    models.forEach(m => {
-                        const opt = document.createElement('option');
-                        opt.value = m.id || m;
-                        list.appendChild(opt);
-                    });
-                    alert(`Fetched ${models.length} models.`);
-                }
-            } catch (e) { alert(e.message); }
+            const res = await fetch('/api/proxy/models', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ apiKey, baseUrl })
+            });
+            const data = await res.json();
+            const list = document.getElementById('model-list');
+            if (!list) return;
+
+            list.innerHTML = '';
+            const models = data?.data || data;
+            if (!Array.isArray(models)) return;
+
+            const ids = models.map((m) => m?.id || m).filter(Boolean);
+            ids.forEach((id) => {
+                const opt = document.createElement('option');
+                opt.value = id;
+                list.appendChild(opt);
+            });
+
+            const modelEl = document.getElementById('chat-model');
+            if (modelEl && !modelEl.value && ids[0]) {
+                modelEl.value = ids[0];
+                syncQuickModelFromSettings();
+            }
+
+            if (!quiet) alert(`Fetched ${ids.length} models.`);
         }
 
         const STANDARD_PROVIDERS = [
