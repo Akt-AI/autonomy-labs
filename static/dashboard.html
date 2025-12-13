@@ -874,6 +874,14 @@
                             class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500" />
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
+                        <div class="hidden md:flex bg-gray-700/60 rounded-lg p-1 mr-2">
+                            <button id="notes-mode-split" onclick="setNotesMode('split')"
+                                class="px-2 py-1 text-xs rounded-md text-gray-200 hover:bg-white/10 transition">Split</button>
+                            <button id="notes-mode-edit" onclick="setNotesMode('edit')"
+                                class="px-2 py-1 text-xs rounded-md text-gray-200 hover:bg-white/10 transition">Edit</button>
+                            <button id="notes-mode-preview" onclick="setNotesMode('preview')"
+                                class="px-2 py-1 text-xs rounded-md text-gray-200 hover:bg-white/10 transition">Preview</button>
+                        </div>
                         <button onclick="aiWriteNotes()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded text-xs" title="Use AI to write in this note">@AI</button>
                         <button onclick="saveActiveNote()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-xs">Save</button>
                         <button onclick="renameActiveNote()" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded text-xs">Rename</button>
@@ -2791,6 +2799,7 @@
             if (!editor || !preview) return;
 
             applyNotesLayout();
+            if (!localStorage.getItem('notes_mode_v1')) localStorage.setItem('notes_mode_v1', 'split');
 
             editor.addEventListener('input', () => {
                 renderNotesPreview();
@@ -3006,18 +3015,40 @@
             const sidebarHidden = localStorage.getItem('notes_sidebar_hidden_v1') === '1';
             const editorHidden = localStorage.getItem('notes_editor_hidden_v1') === '1';
             const previewHidden = localStorage.getItem('notes_preview_hidden_v1') === '1';
+            const mode = localStorage.getItem('notes_mode_v1') || 'split';
 
             sidebar.classList.toggle('hidden', sidebarHidden);
-            editorPane.classList.toggle('hidden', editorHidden);
-            previewPane.classList.toggle('hidden', previewHidden);
+            // Mode overrides per-pane hidden state
+            const forceEditorHidden = mode === 'preview';
+            const forcePreviewHidden = mode === 'edit';
 
-            const editorVisible = !editorHidden;
-            const previewVisible = !previewHidden;
+            editorPane.classList.toggle('hidden', forceEditorHidden ? true : editorHidden);
+            previewPane.classList.toggle('hidden', forcePreviewHidden ? true : previewHidden);
+
+            const editorVisible = !editorPane.classList.contains('hidden');
+            const previewVisible = !previewPane.classList.contains('hidden');
             main.classList.toggle('lg:grid-cols-2', editorVisible && previewVisible);
             main.classList.toggle('lg:grid-cols-1', !(editorVisible && previewVisible));
 
-            if (toggleEditorBtn) toggleEditorBtn.textContent = editorHidden ? 'Show' : 'Hide';
-            if (togglePreviewBtn) togglePreviewBtn.textContent = previewHidden ? 'Show' : 'Hide';
+            if (toggleEditorBtn) toggleEditorBtn.textContent = editorVisible ? 'Hide' : 'Show';
+            if (togglePreviewBtn) togglePreviewBtn.textContent = previewVisible ? 'Hide' : 'Show';
+
+            const btnSplit = document.getElementById('notes-mode-split');
+            const btnEdit = document.getElementById('notes-mode-edit');
+            const btnPreview = document.getElementById('notes-mode-preview');
+            if (btnSplit) btnSplit.classList.toggle('bg-white/10', mode === 'split');
+            if (btnEdit) btnEdit.classList.toggle('bg-white/10', mode === 'edit');
+            if (btnPreview) btnPreview.classList.toggle('bg-white/10', mode === 'preview');
+
+            // Ensure preview stays current when switching to preview-only
+            if (previewVisible) renderNotesPreview();
+        }
+
+        function setNotesMode(mode) {
+            const allowed = new Set(['split', 'edit', 'preview']);
+            const next = allowed.has(mode) ? mode : 'split';
+            localStorage.setItem('notes_mode_v1', next);
+            applyNotesLayout();
         }
 
         function toggleNotesSidebar() {
