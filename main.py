@@ -177,9 +177,12 @@ async def codex_agent(request: CodexRequest):
         )
         stdout, stderr = await proc.communicate(json.dumps(payload).encode("utf-8"))
         if proc.returncode != 0:
+            err_text = (stderr.decode("utf-8", errors="ignore") or "").strip()
+            if "401 Unauthorized" in err_text or "status 401" in err_text:
+                raise HTTPException(status_code=401, detail=err_text or "Unauthorized")
             raise HTTPException(
                 status_code=500,
-                detail=(stderr.decode("utf-8", errors="ignore") or "Codex agent failed"),
+                detail=(err_text or "Codex agent failed"),
             )
         return json.loads(stdout.decode("utf-8"))
     except HTTPException:

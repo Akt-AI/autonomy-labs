@@ -2292,6 +2292,25 @@
             const baseUrl = codex.baseUrl || '';
             const model = document.getElementById('chat-model')?.value || '';
 
+            // If no API key is configured, kick off device auth in the terminal and stop.
+            // This avoids confusing 401s on the very first @codex message.
+            if (!apiKey) {
+                addMessageToUI('user', message || '');
+                const tip = [
+                    "Codex needs authentication.",
+                    "",
+                    "Run device login in the terminal (use the Run button):",
+                    "```bash",
+                    "codex login --device-auth",
+                    "```",
+                    "",
+                    "Or paste an API key in Settings → Codex SDK.",
+                ].join("\n");
+                addMessageToUI('assistant', tip);
+                runInTerminal('codex login --device-auth\n', { preferScope: 'main', autoShow: true });
+                return;
+            }
+
             addMessageToUI('user', message || '');
             scrollToBottom();
 
@@ -2315,6 +2334,9 @@
                 });
                 if (!res.ok) {
                     const txt = await res.text();
+                    if (res.status === 401) {
+                        throw new Error("401 Unauthorized. Set Settings → Codex SDK API key or run `codex login --device-auth` in the terminal.");
+                    }
                     throw new Error(txt || `HTTP ${res.status}`);
                 }
                 const data = await res.json();
