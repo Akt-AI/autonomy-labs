@@ -39,16 +39,9 @@ RUN printf '%s\n' \
   >> /root/.bashrc
 
 # Install CLI tools (network required at build time)
-RUN npm i -g @openai/codex \
+RUN npm i -g @openai/codex @google/gemini-cli \
   && curl -fsSL https://claude.ai/install.sh | bash \
-  && printf '%s\n' \
-  '#!/usr/bin/env bash' \
-  'set -euo pipefail' \
-  '' \
-  '# Using npx (no installation required)' \
-  'exec npx -y github:google-gemini/gemini-cli \"$@\"' \
-  > /usr/local/bin/gemini-cli \
-  && chmod +x /usr/local/bin/gemini-cli
+  && true
 
 # claude install.sh typically drops binaries in ~/.local/bin
 ENV PATH="/root/.local/bin:$PATH"
