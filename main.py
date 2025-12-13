@@ -301,6 +301,37 @@ async def codex_mcp_list():
         return {"servers": []}
 
 
+@app.get("/api/codex/mcp/details")
+async def codex_mcp_details():
+    """
+    Returns `codex mcp get --json` for each configured server.
+    """
+    try:
+        servers_resp = await codex_mcp_list()
+        names = servers_resp.get("servers", []) if isinstance(servers_resp, dict) else []
+        details = []
+        for name in names:
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "codex",
+                    "mcp",
+                    "get",
+                    name,
+                    "--json",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout, _ = await proc.communicate()
+                if proc.returncode != 0:
+                    continue
+                details.append(json.loads(stdout.decode("utf-8", errors="ignore")))
+            except Exception:
+                continue
+        return {"servers": details}
+    except Exception:
+        return {"servers": []}
+
+
 @app.get("/api/codex/login/status")
 async def codex_login_status():
     """

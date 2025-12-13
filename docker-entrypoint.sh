@@ -83,4 +83,17 @@ ensure_filesystem_mcp() {
 
 ensure_filesystem_mcp
 
+ensure_codex_mcp_server() {
+  if ! command -v codex >/dev/null 2>&1; then
+    return 0
+  fi
+  if codex mcp list 2>/dev/null | awk '{print $1}' | grep -qx "codex"; then
+    return 0
+  fi
+  # Expose Codex itself as an MCP server (stdio). Name: codex
+  codex mcp add codex -- codex mcp-server >/dev/null 2>&1 || true
+}
+
+ensure_codex_mcp_server
+
 exec "$@"

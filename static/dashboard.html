@@ -673,6 +673,20 @@
 
                         <div class="pt-4 border-t border-gray-700">
                             <div class="flex items-center justify-between gap-2 mb-2">
+                                <div class="font-semibold text-gray-200">Autonomous Tools</div>
+                            </div>
+                            <label class="flex items-center justify-between gap-3 bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2">
+                                <div>
+                                    <div class="text-sm text-gray-100">Use Codex CLI in Autonomous mode</div>
+                                    <div class="text-xs text-gray-400 mt-0.5">Lets the agent access configured MCP tools (when available).</div>
+                                </div>
+                                <input id="agent-use-codex-cli" type="checkbox" onchange="setAgentUseCodexCli(this.checked)"
+                                    class="h-4 w-4 accent-blue-600">
+                            </label>
+                        </div>
+
+                        <div class="pt-4 border-t border-gray-700">
+                            <div class="flex items-center justify-between gap-2 mb-2">
                                 <div class="font-semibold text-gray-200">MCP</div>
                                 <button onclick="addMcpServerPrompt()"
                                     class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs">+ Add</button>
@@ -1235,6 +1249,16 @@
             localStorage.setItem('codex_sdk_api_key_v1', apiKey);
         }
 
+        function getAgentUseCodexCli() {
+            return localStorage.getItem('agent_use_codex_cli_v1') === '1';
+        }
+
+        function setAgentUseCodexCli(enabled) {
+            localStorage.setItem('agent_use_codex_cli_v1', enabled ? '1' : '0');
+            const el = document.getElementById('agent-use-codex-cli');
+            if (el) el.checked = !!enabled;
+        }
+
         async function refreshCodexMcpServers() {
             const out = document.getElementById('codex-mcp-list');
             if (out) out.textContent = 'Loading...';
@@ -1325,6 +1349,7 @@
                 const codexKey = document.getElementById('codex-api-key');
                 if (codexBase) codexBase.value = codexSettings.baseUrl;
                 if (codexKey) codexKey.value = codexSettings.apiKey;
+                setAgentUseCodexCli(getAgentUseCodexCli());
 
                 // Multi-modal attachments
                 const chatFile = document.getElementById('chat-file-input');
@@ -2428,6 +2453,34 @@
         async function sendChatBarMessage() {
             const input = document.getElementById('chat-input');
             const raw = (input?.value || '').trim();
+            if (raw === '/mcp') {
+                if (input) input.value = '';
+                addMessageToUI('user', '/mcp');
+                const ai = addMessageToUI('assistant', 'Loading MCP servers...');
+                try {
+                    const res = await fetch('/api/codex/mcp/details');
+                    const data = await res.json();
+                    const servers = Array.isArray(data?.servers) ? data.servers : [];
+                    if (!servers.length) {
+                        renderMarkdownInto(ai, 'No MCP servers configured.');
+                        return;
+                    }
+                    const lines = [
+                        `Configured MCP servers (${servers.length}):`,
+                        '',
+                        ...servers.map((s) => `- \`${s?.name || s?.id || 'server'}\` (${s?.status || 'unknown'})`),
+                        '',
+                        'Details:',
+                        '```json',
+                        JSON.stringify(servers, null, 2),
+                        '```',
+                    ].join('\n');
+                    renderMarkdownInto(ai, lines);
+                } catch (e) {
+                    ai.textContent = `Failed to load MCP servers: ${e?.message || e}`;
+                }
+                return;
+            }
             const explicitCodex = raw.toLowerCase().startsWith('@codex');
             const target = explicitCodex ? 'codex' : getChatAgentTarget();
 
@@ -2475,8 +2528,6 @@
             renderAgentAttachments();
             scrollAgentToBottom();
 
-            const apiKey = document.getElementById('chat-api-key').value;
-            const baseUrl = document.getElementById('chat-base-url').value;
             const model = document.getElementById('chat-model').value;
 
             const aiMsgEl = addAgentMessageToUI('assistant', '...');
@@ -2484,27 +2535,55 @@
             try {
                 agentAbortController = new AbortController();
                 setAgentGenerating(true);
-                const res = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ messages: agentChatHistory, apiKey, baseUrl, model }),
-                    signal: agentAbortController.signal
-                });
+                const res = await (async () => {
+                    if (getAgentUseCodexCli()) {
+                        const ok = await ensureCodexAuthenticated();
+                        if (!ok) throw new Error('Codex not authenticated');
+                        return fetch('/api/codex/cli', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                message: agentChatHistory.map(m => (typeof m.content === 'string' ? m.content : '')).join('\n\n'),
+                                threadId: null,
+                                model: model || null,
+                                sandboxMode: 'workspace-write',
+                                approvalPolicy: 'never'
+                            }),
+                            signal: agentAbortController.signal
+                        });
+                    }
 
-                const reader = res.body.getReader();
-                const decoder = new TextDecoder();
-                aiMsgEl.innerHTML = '';
+                    const apiKey = document.getElementById('chat-api-key').value;
+                    const baseUrl = document.getElementById('chat-base-url').value;
+                    return fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ messages: agentChatHistory, apiKey, baseUrl, model }),
+                        signal: agentAbortController.signal
+                    });
+                })();
 
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    aiContent += decoder.decode(value);
-                    aiMsgEl.innerText = aiContent;
-                    scrollAgentToBottom();
+                if (getAgentUseCodexCli()) {
+                    const data = await res.json();
+                    aiContent = data?.finalResponse || '';
+                    renderMarkdownInto(aiMsgEl, aiContent);
+                    agentChatHistory.push({ role: 'assistant', content: aiContent });
+                } else {
+                    const reader = res.body.getReader();
+                    const decoder = new TextDecoder();
+                    aiMsgEl.innerHTML = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        aiContent += decoder.decode(value);
+                        aiMsgEl.innerText = aiContent;
+                        scrollAgentToBottom();
+                    }
+
+                    renderMarkdownInto(aiMsgEl, aiContent);
+                    agentChatHistory.push({ role: 'assistant', content: aiContent });
                 }
-
-                renderMarkdownInto(aiMsgEl, aiContent);
-                agentChatHistory.push({ role: 'assistant', content: aiContent });
             } catch (error) {
                 if (error?.name === 'AbortError') {
                     aiMsgEl.textContent = aiContent ? aiContent : "[stopped]";
