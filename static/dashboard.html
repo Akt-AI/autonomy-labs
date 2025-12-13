@@ -24,6 +24,29 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 
     <style>
+        /* Theme tokens */
+        :root {
+            --app-bg: #111827;
+            --app-fg: #ffffff;
+            --panel-bg: #1f2937;
+            --panel-bg-2: #111827;
+            --border: rgba(75, 85, 99, 0.7);
+            --muted: rgba(203, 213, 225, 0.75);
+        }
+
+        [data-theme="light"] {
+            --app-bg: #f8fafc;
+            --app-fg: #0f172a;
+            --panel-bg: #ffffff;
+            --panel-bg-2: #f1f5f9;
+            --border: rgba(15, 23, 42, 0.12);
+            --muted: rgba(51, 65, 85, 0.75);
+        }
+
+        body {
+            background: var(--app-bg);
+            color: var(--app-fg);
+        }
         .view-section {
             transition: opacity 0.2s;
         }
@@ -335,6 +358,19 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 15h6" />
                     </svg>
                 </button>
+                <button onclick="toggleTheme()" id="nav-theme" title="Toggle theme" aria-label="Toggle theme"
+                    class="p-2 rounded hover:bg-gray-700 text-gray-300 transition inline-flex items-center justify-center">
+                    <span id="theme-icon">☾</span>
+                </button>
+                <button onclick="openSettings()" id="nav-settings" title="Settings" aria-label="Settings"
+                    class="p-2 rounded hover:bg-gray-700 text-gray-300 transition inline-flex items-center justify-center">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37.608-.996.07-2.296-1.065-2.572-1.756-.426-1.756-2.924 0-3.35.996-.242 1.53-1.53 1.066-2.573-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </button>
             </div>
             <div class="flex items-center gap-3 min-w-0">
                 <div id="user-badge" class="hidden md:flex flex-col items-end leading-tight min-w-0">
@@ -365,8 +401,9 @@
             <h1
                 class="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
                 Welcome to Sandbox</h1>
-            <p class="text-gray-400 max-w-md mx-auto mb-8">Your AI-powered development environment. Access the Chat for
+            <p class="text-gray-400 max-w-md mx-auto mb-2">Your AI-powered development environment. Access the Chat for
                 coding assistance or the Terminal for execution.</p>
+            <p class="text-gray-500 text-sm max-w-md mx-auto mb-8">Build faster with chat + runnable terminals.</p>
             <div class="flex gap-4 mb-8">
                 <button onclick="switchMode('chat')"
                     class="px-6 py-3 bg-blue-600 rounded-lg hover:bg-blue-700 font-semibold transition">Open
@@ -450,16 +487,6 @@
                             <button id="chat-mode-auto" onclick="setChatMode('autonomous')"
                                 class="px-2 py-1 text-xs rounded-md text-gray-200 hover:bg-white/10 transition">Autonomous</button>
                         </div>
-                        <button onclick="toggleSettings()"
-                            class="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-700 transition">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
-                                </path>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                            </svg>
-                        </button>
                     </div>
                 </div>
 
@@ -737,6 +764,12 @@
 
     </div>
 
+    <!-- Footer -->
+    <footer class="shrink-0 border-t border-gray-700 bg-gray-800 px-4 py-1 text-xs text-gray-400 flex items-center justify-between">
+        <div>Sandbox — ship ideas faster.</div>
+        <div class="hidden md:block">Chat • Autonomous • Terminal</div>
+    </footer>
+
     <script>
         let supabase;
         // --- Multi-Terminal Logic ---
@@ -931,6 +964,19 @@
             else closeSettings();
         }
 
+        function applyTheme(theme) {
+            const t = theme === 'light' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', t);
+            localStorage.setItem('theme_v1', t);
+            const icon = document.getElementById('theme-icon');
+            if (icon) icon.textContent = t === 'light' ? '☀' : '☾';
+        }
+
+        function toggleTheme() {
+            const current = localStorage.getItem('theme_v1') || 'dark';
+            applyTheme(current === 'dark' ? 'light' : 'dark');
+        }
+
         async function init() {
             try {
                 const res = await fetch('/config');
@@ -940,6 +986,11 @@
 
                 const { data: { session } } = await supabase.auth.getSession();
                 if (!session) { window.location.href = '/'; return; }
+
+                // Theme
+                const savedTheme = localStorage.getItem('theme_v1');
+                if (savedTheme) applyTheme(savedTheme);
+                else applyTheme('dark');
 
                 // Logged-in user badge (email + username)
                 try {
