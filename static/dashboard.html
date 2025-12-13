@@ -453,11 +453,20 @@
         <div id="chat-view" class="view-section hidden w-full h-full flex overflow-hidden">
             <!-- Sidebar for History (Desktop) -->
             <div id="chat-sidebar" class="w-64 bg-gray-800 border-r border-gray-700 flex flex-col hidden md:flex shrink-0">
-                <div class="p-3 border-b border-gray-700">
+                <div class="p-3 border-b border-gray-700 flex items-center gap-2">
                     <button onclick="startNewChat()"
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded flex items-center justify-center gap-2 text-sm font-medium transition">
+                        class="flex-grow bg-blue-600 hover:bg-blue-700 text-white py-2 rounded flex items-center justify-center gap-2 text-sm font-medium transition"
+                        title="New chat" aria-label="New chat">
                         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14" />
+                        </svg>
+                    </button>
+                    <button onclick="toggleChatSidebar()"
+                        class="hidden md:inline-flex p-2 rounded hover:bg-gray-700 text-gray-300 transition"
+                        title="Collapse history" aria-label="Collapse history">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 6h16M4 12h16M4 18h16"></path>
                         </svg>
                     </button>
                 </div>
@@ -471,16 +480,9 @@
                     class="bg-gray-800 p-3 border-b border-gray-700 flex justify-between items-center shadow-sm shrink-0">
                     <div class="flex items-center gap-3 overflow-hidden">
                         <button onclick="toggleChatSidebar()"
-                            class="md:hidden text-gray-400 p-1">
-                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M4 6h16M4 12h16M4 18h16"></path>
-                            </svg>
-                        </button>
-                        <button onclick="toggleChatSidebar()"
-                            class="hidden md:inline-flex text-gray-400 hover:text-white p-1 rounded hover:bg-gray-700 transition"
+                            class="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-700 transition"
                             title="Toggle history" aria-label="Toggle history">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M4 6h16M4 12h16M4 18h16"></path>
                             </svg>
@@ -989,10 +991,18 @@
             if (!sidebar) return;
             const key = 'chat_sidebar_collapsed_v1';
 
-            const currentlyHidden = sidebar.classList.contains('hidden');
-            const nextHidden = typeof forceOpen === 'boolean' ? !forceOpen : !currentlyHidden;
-            sidebar.classList.toggle('hidden', nextHidden);
-            localStorage.setItem(key, nextHidden ? '1' : '0');
+            const isDesktop = window.matchMedia && window.matchMedia('(min-width: 768px)').matches;
+            if (isDesktop) {
+                const currentlyCollapsed = sidebar.classList.contains('md:hidden');
+                const nextCollapsed = typeof forceOpen === 'boolean' ? !forceOpen : !currentlyCollapsed;
+                sidebar.classList.toggle('md:hidden', nextCollapsed);
+                localStorage.setItem(key, nextCollapsed ? '1' : '0');
+            } else {
+                const currentlyHidden = sidebar.classList.contains('hidden');
+                const nextHidden = typeof forceOpen === 'boolean' ? !forceOpen : !currentlyHidden;
+                sidebar.classList.toggle('hidden', nextHidden);
+                // don't overwrite desktop preference on mobile toggle
+            }
         }
 
         async function init() {
