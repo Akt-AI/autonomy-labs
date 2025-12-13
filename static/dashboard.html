@@ -2203,6 +2203,53 @@
             if (main && quick) quick.value = main.value || '';
         }
 
+        function getCodexThreadId() {
+            return localStorage.getItem('codex_thread_id_v1') || '';
+        }
+
+        function setCodexThreadId(id) {
+            if (id) localStorage.setItem('codex_thread_id_v1', id);
+        }
+
+        async function sendCodexSdkMessage(message) {
+            const apiKey = document.getElementById('chat-api-key')?.value || '';
+            const baseUrl = document.getElementById('chat-base-url')?.value || '';
+            const model = document.getElementById('chat-model')?.value || '';
+
+            addMessageToUI('user', message || '');
+            scrollToBottom();
+
+            const aiMsgEl = addMessageToUI('assistant', '...');
+            aiMsgEl.innerHTML = '';
+
+            try {
+                const res = await fetch('/api/codex', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message,
+                        threadId: getCodexThreadId() || null,
+                        model: model || null,
+                        sandboxMode: 'read-only',
+                        approvalPolicy: 'never',
+                        // Prefer configured OpenAI-compatible creds if present; codex-sdk also reads env vars.
+                        apiKey: apiKey || null,
+                        baseUrl: baseUrl || null
+                    })
+                });
+                if (!res.ok) {
+                    const txt = await res.text();
+                    throw new Error(txt || `HTTP ${res.status}`);
+                }
+                const data = await res.json();
+                if (data?.threadId) setCodexThreadId(data.threadId);
+                const finalText = data?.finalResponse || '';
+                renderMarkdownInto(aiMsgEl, finalText);
+            } catch (e) {
+                aiMsgEl.textContent = `Error: ${e?.message || e}`;
+            }
+        }
+
         async function sendChatBarMessage() {
             const input = document.getElementById('chat-input');
             const raw = (input?.value || '').trim();
@@ -2211,12 +2258,8 @@
 
             if (target === 'codex') {
                 const message = raw.replace(/^@codex\b\s*/i, '');
-                openAutonomousMode();
-                ensureAgentTerminalVisible();
-                const agentInput = document.getElementById('agent-chat-input');
-                if (agentInput) agentInput.value = message;
                 if (input) input.value = '';
-                return sendAgentMessage();
+                return sendCodexSdkMessage(message);
             }
 
             return sendMessage();

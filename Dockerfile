@@ -49,6 +49,10 @@ ENV PATH="/root/.local/bin:$PATH"
 # Working directory
 WORKDIR /app
 
+# Install Node dependencies needed by the app (Codex SDK)
+COPY package.json .
+RUN npm install --omit=dev
+
 # Copy python dependencies
 COPY requirements.txt .
 

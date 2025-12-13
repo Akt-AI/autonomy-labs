@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from openai import OpenAI
+import json
 
 load_dotenv()
 
@@ -124,6 +125,65 @@ async def proxy_models(request: ModelsRequest):
         print(f"Error fetching models: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+class CodexRequest(BaseModel):
+    message: str
+    threadId: Optional[str] = None
+    model: Optional[str] = None
+    sandboxMode: Optional[str] = "read-only"
+    approvalPolicy: Optional[str] = "never"
+    apiKey: Optional[str] = None
+    baseUrl: Optional[str] = None
+
+@app.post("/api/codex")
+async def codex_agent(request: CodexRequest):
+    """
+    Runs the local Codex agent via the official @openai/codex-sdk wrapper (Node.js).
+    Persists threads under ~/.codex/sessions (mapped to /data/.codex on Spaces by entrypoint).
+    """
+    if not request.message.strip():
+        raise HTTPException(status_code=400, detail="Message is required")
+
+    node = os.environ.get("NODE_BIN", "node")
+    script_path = os.path.join(os.path.dirname(__file__), "codex_agent.mjs")
+    if not os.path.exists(script_path):
+        raise HTTPException(status_code=500, detail="codex_agent.mjs not found")
+
+    payload = {
+        "message": request.message,
+        "threadId": request.threadId,
+        "model": request.model,
+        "sandboxMode": request.sandboxMode,
+        "approvalPolicy": request.approvalPolicy,
+        "workingDirectory": os.path.dirname(__file__),
+    }
+
+    try:
+        env = os.environ.copy()
+        if request.apiKey:
+            env["CODEX_API_KEY"] = request.apiKey
+            env["OPENAI_API_KEY"] = request.apiKey
+        if request.baseUrl:
+            env["OPENAI_BASE_URL"] = request.baseUrl
+
+        proc = await asyncio.create_subprocess_exec(
+            node,
+            script_path,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+        )
+        stdout, stderr = await proc.communicate(json.dumps(payload).encode("utf-8"))
+        if proc.returncode != 0:
+            raise HTTPException(
+                status_code=500,
+                detail=(stderr.decode("utf-8", errors="ignore") or "Codex agent failed"),
+            )
+        return json.loads(stdout.decode("utf-8"))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.websocket("/ws/terminal")
 async def websocket_terminal(websocket: WebSocket):
