@@ -407,6 +407,8 @@
                     id="nav-dashboard">Dashboard</button>
                 <button onclick="switchMode('chat')"
                     class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition" id="nav-chat">Chat</button>
+                <button onclick="switchMode('notes')"
+                    class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition" id="nav-notes">Notes</button>
             </div>
             <!-- Center: welcome -->
             <div class="hidden md:flex flex-1 justify-center min-w-0">
@@ -451,6 +453,8 @@
                 class="block w-full text-left px-3 py-2 rounded hover:bg-gray-700 text-gray-300">Dashboard</button>
             <button onclick="switchMode('chat')"
                 class="block w-full text-left px-3 py-2 rounded hover:bg-gray-700 text-gray-300">Chat</button>
+            <button onclick="switchMode('notes')"
+                class="block w-full text-left px-3 py-2 rounded hover:bg-gray-700 text-gray-300">Notes</button>
             <button onclick="switchMode('terminal')"
                 class="block w-full text-left px-3 py-2 rounded hover:bg-gray-700 text-gray-300">Terminal</button>
         </div>
@@ -650,42 +654,10 @@
                         <div class="pt-4 border-t border-gray-700">
                             <div class="flex items-center justify-between gap-2 mb-2">
                                 <div class="font-semibold text-gray-200">Notes</div>
-                                <div class="flex gap-2">
-                                    <button onclick="createNotesFolder()"
-                                        class="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs">+ Folder</button>
-                                    <button onclick="createNotesDoc()"
-                                        class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs">+ Note</button>
-                                    <button onclick="saveActiveNote()"
-                                        class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs">Save</button>
-                                </div>
+                                <button onclick="switchMode('notes'); closeSettings();"
+                                    class="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs">Open Notes</button>
                             </div>
-                            <div class="text-xs text-gray-400 mb-2">Markdown notes with folders (saved to Supabase).</div>
-
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div class="bg-gray-900/40 border border-gray-700 rounded-lg p-2 overflow-auto" style="max-height: 340px;">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <div class="text-xs text-gray-400">Folders</div>
-                                        <button onclick="refreshNotesTree()" class="text-xs text-gray-300 hover:text-white">↻</button>
-                                    </div>
-                                    <div id="notes-tree" class="text-sm space-y-1"></div>
-                                </div>
-                                <div class="space-y-2">
-                                    <input id="notes-title" type="text" placeholder="Title"
-                                        class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500" />
-                                    <textarea id="notes-editor" rows="8"
-                                        class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500 font-mono"
-                                        placeholder="# Notes..."></textarea>
-                                    <div class="text-xs text-gray-400">Preview</div>
-                                    <div id="notes-preview" class="prose prose-invert max-w-none bg-gray-900/40 border border-gray-700 rounded-lg p-3 overflow-auto" style="max-height: 180px;"></div>
-                                    <div class="flex items-center justify-between">
-                                        <div id="notes-status" class="text-xs text-gray-500"></div>
-                                        <div class="flex gap-2">
-                                            <button onclick="renameActiveNote()" class="text-xs text-gray-300 hover:text-white">Rename</button>
-                                            <button onclick="deleteActiveNote()" class="text-xs text-red-300 hover:text-red-200">Delete</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <div class="text-xs text-gray-400">Notes editor is available in the Notes tab.</div>
                         </div>
                     </div>
                 </div>
@@ -871,6 +843,49 @@
                 <div id="terminal-pane-2" class="terminal-pane hidden"></div>
                 <div id="terminal-pane-3" class="terminal-pane hidden"></div>
                 <div id="terminal-pane-4" class="terminal-pane hidden"></div>
+            </div>
+        </div>
+
+        <!-- Notes View -->
+        <div id="notes-view" class="view-section hidden w-full h-full flex overflow-hidden bg-gray-900">
+            <div class="w-72 bg-gray-800 border-r border-gray-700 flex flex-col shrink-0">
+                <div class="p-3 border-b border-gray-700 flex items-center justify-between gap-2">
+                    <div class="font-semibold text-gray-200">Notes</div>
+                    <div class="flex gap-2">
+                        <button onclick="createNotesFolder()" class="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs">+ Folder</button>
+                        <button onclick="createNotesDoc()" class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs">+ Note</button>
+                    </div>
+                </div>
+                <div class="p-2 border-b border-gray-700">
+                    <button onclick="refreshNotesTree()" class="text-xs text-gray-300 hover:text-white">↻ Refresh</button>
+                </div>
+                <div id="notes-tree" class="flex-grow overflow-y-auto p-2 text-sm space-y-1"></div>
+            </div>
+            <div class="flex-grow min-w-0 flex flex-col">
+                <div class="p-3 border-b border-gray-700 bg-gray-800 flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0 flex-1">
+                        <input id="notes-title" type="text" placeholder="Title"
+                            class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500" />
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button onclick="saveActiveNote()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-xs">Save</button>
+                        <button onclick="renameActiveNote()" class="bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded text-xs">Rename</button>
+                        <button onclick="deleteActiveNote()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-xs">Delete</button>
+                    </div>
+                </div>
+                <div class="flex-grow min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-0">
+                    <div class="min-h-0 flex flex-col border-r border-gray-700">
+                        <div class="px-3 py-2 text-xs text-gray-400 border-b border-gray-700 bg-gray-900/30">Editor</div>
+                        <textarea id="notes-editor"
+                            class="flex-grow min-h-0 w-full bg-gray-900 text-sm p-3 text-white outline-none font-mono"
+                            placeholder="# Notes..."></textarea>
+                    </div>
+                    <div class="min-h-0 flex flex-col">
+                        <div class="px-3 py-2 text-xs text-gray-400 border-b border-gray-700 bg-gray-900/30">Preview</div>
+                        <div id="notes-preview" class="flex-grow min-h-0 overflow-y-auto prose prose-invert max-w-none p-4"></div>
+                    </div>
+                </div>
+                <div class="px-3 py-2 text-xs text-gray-400 border-t border-gray-700 bg-gray-800" id="notes-status"></div>
             </div>
         </div>
 
@@ -1253,7 +1268,7 @@
 
         // --- View Switching ---
         function switchMode(mode) {
-            const sections = ['dashboard', 'chat', 'terminal'];
+            const sections = ['dashboard', 'chat', 'terminal', 'notes'];
             sections.forEach((m) => {
                 const el = document.getElementById(`${m}-view`);
                 const btn = document.getElementById(`nav-${m}`);
@@ -1262,6 +1277,7 @@
             });
 
             if (mode === 'terminal' && activeTerminalId) setTimeout(() => fitTerm(activeTerminalId), 50);
+            if (mode === 'notes') setTimeout(() => { refreshNotesTree(); }, 0);
 
             document.getElementById('mobile-menu').classList.add('hidden');
         }
