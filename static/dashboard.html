@@ -694,11 +694,20 @@
                     <div class="p-3 bg-gray-800 border-t border-gray-700 shrink-0">
                         <div id="chat-attachments" class="max-w-5xl mx-auto mb-2 hidden"></div>
                         <div class="flex space-x-2 max-w-5xl mx-auto items-center">
+                            <select id="chat-agent-target" onchange="setChatAgentTarget(this.value)"
+                                class="bg-gray-700 h-10 rounded-lg border border-gray-600 px-2 text-sm text-white outline-none focus:border-blue-500"
+                                title="Target">
+                                <option value="chat">Chat</option>
+                                <option value="codex">@codex</option>
+                            </select>
                             <textarea id="chat-input" rows="1"
                                 class="flex-grow bg-gray-700 px-3 py-2 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-32"
                                 placeholder="Message..."
                                 oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
                                 onkeydown="handleEnter(event)"></textarea>
+                            <input id="chat-model-quick" type="text" list="model-list" placeholder="Model"
+                                class="bg-gray-700 h-10 w-44 px-2 rounded-lg border border-gray-600 text-sm text-white outline-none focus:border-blue-500 hidden sm:block"
+                                onchange="setQuickModel(this.value)" title="Model" />
                             <input id="chat-file-input" type="file" accept="image/*" multiple class="hidden" />
                             <button onclick="document.getElementById('chat-file-input').click()"
                                 class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"
@@ -732,7 +741,7 @@
                                 </svg>
                                 Stop
                             </button>
-                            <button onclick="sendMessage()"
+                            <button onclick="sendChatBarMessage()"
                                 class="bg-blue-600 h-10 w-10 rounded-lg hover:bg-blue-700 font-bold transition inline-flex items-center justify-center">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -1240,6 +1249,10 @@
                 // Restore last chat mode (chat/autonomous)
                 const savedMode = localStorage.getItem('chat_mode_v1') || 'chat';
                 setChatMode(savedMode);
+
+                // Chat bar quick controls
+                setChatAgentTarget(getChatAgentTarget());
+                syncQuickModelFromSettings();
 
                 // Multi-modal attachments
                 const chatFile = document.getElementById('chat-file-input');
@@ -2160,8 +2173,53 @@
         function handleEnter(e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                sendMessage();
+                sendChatBarMessage();
             }
+        }
+
+        function getChatAgentTarget() {
+            return localStorage.getItem('chat_agent_target_v1') || 'chat';
+        }
+
+        function setChatAgentTarget(target) {
+            const t = target === 'codex' ? 'codex' : 'chat';
+            localStorage.setItem('chat_agent_target_v1', t);
+            const sel = document.getElementById('chat-agent-target');
+            if (sel) sel.value = t;
+        }
+
+        function setQuickModel(model) {
+            const m = (model || '').trim();
+            if (!m) return;
+            const main = document.getElementById('chat-model');
+            if (main) main.value = m;
+            const quick = document.getElementById('chat-model-quick');
+            if (quick) quick.value = m;
+        }
+
+        function syncQuickModelFromSettings() {
+            const main = document.getElementById('chat-model');
+            const quick = document.getElementById('chat-model-quick');
+            if (main && quick) quick.value = main.value || '';
+        }
+
+        async function sendChatBarMessage() {
+            const input = document.getElementById('chat-input');
+            const raw = (input?.value || '').trim();
+            const explicitCodex = raw.toLowerCase().startsWith('@codex');
+            const target = explicitCodex ? 'codex' : getChatAgentTarget();
+
+            if (target === 'codex') {
+                const message = raw.replace(/^@codex\b\s*/i, '');
+                openAutonomousMode();
+                ensureAgentTerminalVisible();
+                const agentInput = document.getElementById('agent-chat-input');
+                if (agentInput) agentInput.value = message;
+                if (input) input.value = '';
+                return sendAgentMessage();
+            }
+
+            return sendMessage();
         }
 
         // --- Autonomous Mode (Agent) ---
