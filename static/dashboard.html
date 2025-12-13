@@ -419,7 +419,10 @@
                 <div class="p-3 border-b border-gray-700">
                     <button onclick="startNewChat()"
                         class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded flex items-center justify-center gap-2 text-sm font-medium transition">
-                        <span>+ New Chat</span>
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14M5 12h14" />
+                        </svg>
+                        <span>New Chat</span>
                     </button>
                 </div>
                 <div id="history-list" class="flex-grow overflow-y-auto p-2 space-y-1"></div>
@@ -567,17 +570,34 @@
                             <input id="chat-file-input" type="file" accept="image/*" multiple class="hidden" />
                             <button onclick="document.getElementById('chat-file-input').click()"
                                 class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"
-                                title="Attach images">
-                                📎
+                                title="Attach images" aria-label="Attach images">
+                                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21.44 11.05l-8.49 8.49a5 5 0 0 1-7.07-7.07l9.2-9.2a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.2a2 2 0 0 1-2.83-2.83l8.49-8.49" />
+                                </svg>
                             </button>
                             <button onclick="captureScreenshotToChat()"
                                 class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"
-                                title="Take screenshot">
-                                ⧉
+                                title="Take screenshot" aria-label="Take screenshot">
+                                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h4l2-2h4l2 2h4v12H4V7z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+                                </svg>
+                            </button>
+                            <button id="chat-mic-btn" onclick="toggleChatDictation()"
+                                class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"
+                                title="Voice input" aria-label="Voice input">
+                                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 0 1-14 0" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19v3" />
+                                </svg>
                             </button>
                             <button id="chat-stop-btn" onclick="stopChatGeneration()" disabled
                                 class="bg-gray-600 h-10 px-3 rounded-lg hover:bg-gray-700 font-bold transition inline-flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
                                 title="Stop generating">
+                                <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                                    <rect x="7" y="7" width="10" height="10" rx="2" />
+                                </svg>
                                 Stop
                             </button>
                             <button onclick="sendMessage()"
@@ -618,18 +638,35 @@
                                         onkeydown="handleAgentEnter(event)"></textarea>
                                     <input id="agent-file-input" type="file" accept="image/*" multiple class="hidden" />
                                     <button onclick="document.getElementById('agent-file-input').click()"
-                                        class="bg-gray-700 px-3 py-2 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
-                                        title="Attach images">
-                                        📎
+                                        class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"
+                                        title="Attach images" aria-label="Attach images">
+                                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21.44 11.05l-8.49 8.49a5 5 0 0 1-7.07-7.07l9.2-9.2a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.2a2 2 0 0 1-2.83-2.83l8.49-8.49" />
+                                        </svg>
                                     </button>
                                     <button onclick="captureScreenshotToAgent()"
-                                        class="bg-gray-700 px-3 py-2 rounded-lg hover:bg-gray-600 transition flex items-center text-gray-200"
-                                        title="Take screenshot">
-                                        ⧉
+                                        class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"
+                                        title="Take screenshot" aria-label="Take screenshot">
+                                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h4l2-2h4l2 2h4v12H4V7z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+                                        </svg>
+                                    </button>
+                                    <button id="agent-mic-btn" onclick="toggleAgentDictation()"
+                                        class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"
+                                        title="Voice input" aria-label="Voice input">
+                                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 0 1-14 0" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19v3" />
+                                        </svg>
                                     </button>
                                     <button id="agent-stop-btn" onclick="stopAgentGeneration()" disabled
                                         class="bg-gray-600 px-3 py-2 rounded-lg hover:bg-gray-700 font-bold transition flex items-center disabled:opacity-40 disabled:cursor-not-allowed"
                                         title="Stop generating">
+                                        <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                                            <rect x="7" y="7" width="10" height="10" rx="2" />
+                                        </svg>
                                         Stop
                                     </button>
                                     <button onclick="sendAgentMessage()"
@@ -1409,6 +1446,10 @@
         let agentAbortController = null;
         let chatImageAttachments = []; // [{ dataUrl, mime }]
         let agentImageAttachments = []; // [{ dataUrl, mime }]
+        let chatRecognition = null;
+        let agentRecognition = null;
+        let chatDictating = false;
+        let agentDictating = false;
 
         function setChatGenerating(isGenerating) {
             const btn = document.getElementById('chat-stop-btn');
@@ -1428,6 +1469,120 @@
 
         function stopAgentGeneration() {
             if (agentAbortController) agentAbortController.abort();
+        }
+
+        function isSpeechRecognitionSupported() {
+            return typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
+        }
+
+        function setMicButtonState(btnId, active) {
+            const btn = document.getElementById(btnId);
+            if (!btn) return;
+            btn.classList.toggle('bg-red-700', !!active);
+            btn.classList.toggle('hover:bg-red-600', !!active);
+            btn.classList.toggle('bg-gray-700', !active);
+            btn.classList.toggle('hover:bg-gray-600', !active);
+        }
+
+        function toggleChatDictation() {
+            if (!isSpeechRecognitionSupported()) {
+                alert('Voice input not supported in this browser.');
+                return;
+            }
+            if (!chatRecognition) {
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                chatRecognition = new SR();
+                chatRecognition.continuous = true;
+                chatRecognition.interimResults = true;
+                chatRecognition.lang = navigator.language || 'en-US';
+                chatRecognition.onresult = (event) => {
+                    const input = document.getElementById('chat-input');
+                    if (!input) return;
+                    let finalText = '';
+                    let interimText = '';
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const res = event.results[i];
+                        const text = res[0]?.transcript || '';
+                        if (res.isFinal) finalText += text;
+                        else interimText += text;
+                    }
+                    // Append final text; show interim as placeholder
+                    if (finalText) {
+                        input.value = (input.value ? input.value + ' ' : '') + finalText.trim();
+                        input.dispatchEvent(new Event('input'));
+                    }
+                    input.placeholder = interimText ? interimText.trim() : 'Message...';
+                };
+                chatRecognition.onerror = () => {
+                    chatDictating = false;
+                    setMicButtonState('chat-mic-btn', false);
+                };
+                chatRecognition.onend = () => {
+                    chatDictating = false;
+                    setMicButtonState('chat-mic-btn', false);
+                    const input = document.getElementById('chat-input');
+                    if (input) input.placeholder = 'Message...';
+                };
+            }
+            if (chatDictating) {
+                chatRecognition.stop();
+                chatDictating = false;
+                setMicButtonState('chat-mic-btn', false);
+            } else {
+                chatRecognition.start();
+                chatDictating = true;
+                setMicButtonState('chat-mic-btn', true);
+            }
+        }
+
+        function toggleAgentDictation() {
+            if (!isSpeechRecognitionSupported()) {
+                alert('Voice input not supported in this browser.');
+                return;
+            }
+            if (!agentRecognition) {
+                const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+                agentRecognition = new SR();
+                agentRecognition.continuous = true;
+                agentRecognition.interimResults = true;
+                agentRecognition.lang = navigator.language || 'en-US';
+                agentRecognition.onresult = (event) => {
+                    const input = document.getElementById('agent-chat-input');
+                    if (!input) return;
+                    let finalText = '';
+                    let interimText = '';
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const res = event.results[i];
+                        const text = res[0]?.transcript || '';
+                        if (res.isFinal) finalText += text;
+                        else interimText += text;
+                    }
+                    if (finalText) {
+                        input.value = (input.value ? input.value + ' ' : '') + finalText.trim();
+                        input.dispatchEvent(new Event('input'));
+                    }
+                    input.placeholder = interimText ? interimText.trim() : 'Ask agent...';
+                };
+                agentRecognition.onerror = () => {
+                    agentDictating = false;
+                    setMicButtonState('agent-mic-btn', false);
+                };
+                agentRecognition.onend = () => {
+                    agentDictating = false;
+                    setMicButtonState('agent-mic-btn', false);
+                    const input = document.getElementById('agent-chat-input');
+                    if (input) input.placeholder = 'Ask agent...';
+                };
+            }
+            if (agentDictating) {
+                agentRecognition.stop();
+                agentDictating = false;
+                setMicButtonState('agent-mic-btn', false);
+            } else {
+                agentRecognition.start();
+                agentDictating = true;
+                setMicButtonState('agent-mic-btn', true);
+            }
         }
 
         function guessMimeFromDataUrl(dataUrl) {
