@@ -2812,6 +2812,24 @@
             applyNotesLayout();
             if (!localStorage.getItem('notes_mode_v1')) localStorage.setItem('notes_mode_v1', 'split');
 
+            editor.addEventListener('keydown', async (e) => {
+                if (e.key !== 'Enter' || e.shiftKey) return;
+
+                const value = editor.value || '';
+                const cursor = editor.selectionStart ?? value.length;
+                const lineStart = value.lastIndexOf('\n', cursor - 1) + 1;
+                const lineEnd = value.indexOf('\n', cursor);
+                const end = lineEnd === -1 ? value.length : lineEnd;
+                const line = value.slice(lineStart, end).trim();
+
+                if (!line.toLowerCase().startsWith('@ai ')) return;
+                e.preventDefault();
+
+                const query = line.slice(4).trim();
+                if (!query) return;
+                await aiRespondIntoNotes(lineStart, end, query);
+            });
+
             editor.addEventListener('input', () => {
                 renderNotesPreview();
                 setNotesStatus('Not saved');
@@ -3014,6 +3032,57 @@
             }
         }
 
+        async function aiRespondIntoNotes(replaceStart, replaceEnd, query) {
+            const { title, editor } = getNotesInputs();
+            if (!editor) return;
+            const provider = getProviderInputs();
+            if (!provider.baseUrl) {
+                alert('Set Base URL in Settings first.');
+                return;
+            }
+
+            if (notesAiAbortController) notesAiAbortController.abort();
+            notesAiAbortController = new AbortController();
+            setNotesStatus('AI responding…');
+
+            const messages = [
+                { role: 'system', content: 'Reply conversationally and concisely. Plain text is fine.' },
+                { role: 'user', content: query }
+            ];
+
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ messages, apiKey: provider.apiKey, baseUrl: provider.baseUrl, model: provider.model }),
+                    signal: notesAiAbortController.signal
+                });
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let out = '';
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    out += decoder.decode(value);
+                }
+
+                const answer = (out || '').trim() || '(no response)';
+                const before = editor.value.slice(0, replaceStart);
+                const after = editor.value.slice(replaceEnd);
+                const block = `**@ai:** ${query}\n\n**AI:** ${answer}\n`;
+                editor.value = before + block + after;
+                const cursor = (before + block).length;
+                editor.selectionStart = editor.selectionEnd = cursor;
+                editor.dispatchEvent(new Event('input'));
+                setNotesStatus(`AI inserted (${new Date().toLocaleTimeString()})`);
+            } catch (e) {
+                if (e?.name === 'AbortError') setNotesStatus('AI canceled.');
+                else setNotesStatus(`AI failed: ${e?.message || e}`);
+            } finally {
+                notesAiAbortController = null;
+            }
+        }
+
         function applyNotesLayout() {
             const sidebar = document.getElementById('notes-sidebar');
             const editorPane = document.getElementById('notes-editor-pane');
@@ -3029,12 +3098,19 @@
             const mode = localStorage.getItem('notes_mode_v1') || 'split';
 
             sidebar.classList.toggle('hidden', sidebarHidden);
-            // Mode overrides per-pane hidden state
-            const forceEditorHidden = mode === 'preview';
-            const forcePreviewHidden = mode === 'edit';
+            // Mode overrides per-pane hidden state (mode always wins)
+            const effectiveEditorHidden =
+                mode === 'preview' ? true :
+                mode === 'edit' ? false :
+                editorHidden;
 
-            editorPane.classList.toggle('hidden', forceEditorHidden ? true : editorHidden);
-            previewPane.classList.toggle('hidden', forcePreviewHidden ? true : previewHidden);
+            const effectivePreviewHidden =
+                mode === 'edit' ? true :
+                mode === 'preview' ? false :
+                previewHidden;
+
+            editorPane.classList.toggle('hidden', !!effectiveEditorHidden);
+            previewPane.classList.toggle('hidden', !!effectivePreviewHidden);
 
             const editorVisible = !editorPane.classList.contains('hidden');
             const previewVisible = !previewPane.classList.contains('hidden');
