@@ -34,7 +34,7 @@ RUN printf '%s\n' \
     '' \
     '# Codex auth: device flow works best in container/web terminals.' \
     "alias codex-login='codex login --device-auth'" \
-    'printf \"\\n[codex] Tip: in Spaces/web terminals use device auth: codex login --device-auth (or codex-login)\\n\\n\"' \
+    "printf '\\n[codex] Tip: in Spaces/web terminals use device auth: codex login --device-auth (or codex-login)\\n\\n'" \
   >> /root/.bashrc
 
 # Install CLI tools (network required at build time)
