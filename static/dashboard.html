@@ -633,6 +633,20 @@
 
                         <div class="pt-4 border-t border-gray-700">
                             <div class="flex items-center justify-between gap-2 mb-2">
+                                <div class="font-semibold text-gray-200">Access</div>
+                            </div>
+                            <label class="flex items-center justify-between gap-3 bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2">
+                                <div>
+                                    <div class="text-sm text-gray-100">Enable Sign Up / Register</div>
+                                    <div class="text-xs text-gray-400 mt-0.5">Default disabled. Affects the login page “Register” button.</div>
+                                </div>
+                                <input id="auth-allow-signup" type="checkbox" onchange="setAllowSignup(this.checked)"
+                                    class="h-4 w-4 accent-blue-600">
+                            </label>
+                        </div>
+
+                        <div class="pt-4 border-t border-gray-700">
+                            <div class="flex items-center justify-between gap-2 mb-2">
                                 <div class="font-semibold text-gray-200">MCP</div>
                                 <button onclick="addMcpServerPrompt()"
                                     class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs">+ Add</button>
@@ -1101,6 +1115,8 @@
             if (!overlay || !drawer) return;
             overlay.classList.remove('settings-hidden');
             drawer.classList.remove('settings-hidden');
+            const signupToggle = document.getElementById('auth-allow-signup');
+            if (signupToggle) signupToggle.checked = getAllowSignup();
         }
 
         function closeSettings() {
@@ -1157,6 +1173,16 @@
             }
         }
 
+        function getAllowSignup() {
+            return localStorage.getItem('auth_allow_signup_v1') === '1';
+        }
+
+        function setAllowSignup(allowed) {
+            localStorage.setItem('auth_allow_signup_v1', allowed ? '1' : '0');
+            const el = document.getElementById('auth-allow-signup');
+            if (el) el.checked = !!allowed;
+        }
+
         async function init() {
             try {
                 const res = await fetch('/config');
@@ -1175,6 +1201,11 @@
                 // Chat sidebar collapse preference (desktop)
                 if (localStorage.getItem('chat_sidebar_collapsed_v1') === '1') {
                     toggleChatSidebar(false);
+                }
+
+                // Access preferences
+                if (localStorage.getItem('auth_allow_signup_v1') == null) {
+                    localStorage.setItem('auth_allow_signup_v1', '0');
                 }
 
                 // Logged-in user badge (email + username)
