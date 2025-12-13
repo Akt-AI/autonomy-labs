@@ -35,12 +35,12 @@
         }
 
         [data-theme="light"] {
-            --app-bg: #f8fafc;
-            --app-fg: #0f172a;
+            --app-bg: #f6f7fb;
+            --app-fg: #0b1220;
             --panel-bg: #ffffff;
-            --panel-bg-2: #f1f5f9;
-            --border: rgba(15, 23, 42, 0.12);
-            --muted: rgba(51, 65, 85, 0.75);
+            --panel-bg-2: #f3f5fa;
+            --border: rgba(2, 6, 23, 0.12);
+            --muted: rgba(30, 41, 59, 0.72);
         }
 
         body {
@@ -58,14 +58,15 @@
         [data-theme="light"] .bg-gray-900 { background-color: var(--panel-bg-2) !important; }
         [data-theme="light"] .bg-gray-800 { background-color: var(--panel-bg) !important; }
         [data-theme="light"] .bg-black { background-color: #0b1220 !important; }
+        [data-theme="light"] #terminal-view { background-color: var(--panel-bg-2) !important; }
         [data-theme="light"] .border-gray-700 { border-color: var(--border) !important; }
         [data-theme="light"] .border-gray-600 { border-color: var(--border) !important; }
 
         /* Text utility overrides for light mode */
         [data-theme="light"] .text-white { color: var(--app-fg) !important; }
-        [data-theme="light"] .text-gray-300 { color: rgba(51, 65, 85, 0.85) !important; }
-        [data-theme="light"] .text-gray-400 { color: rgba(51, 65, 85, 0.75) !important; }
-        [data-theme="light"] .text-gray-500 { color: rgba(51, 65, 85, 0.65) !important; }
+        [data-theme="light"] .text-gray-300 { color: rgba(30, 41, 59, 0.9) !important; }
+        [data-theme="light"] .text-gray-400 { color: rgba(30, 41, 59, 0.72) !important; }
+        [data-theme="light"] .text-gray-500 { color: rgba(30, 41, 59, 0.6) !important; }
 
         /* Inputs in light mode */
         [data-theme="light"] input,
@@ -74,6 +75,18 @@
             background-color: #ffffff !important;
             color: var(--app-fg) !important;
             border-color: var(--border) !important;
+        }
+
+        /* Chat bubbles in light mode */
+        [data-theme="light"] .user-message {
+            background-color: rgba(37, 99, 235, 0.10);
+            border-color: rgba(37, 99, 235, 0.22);
+            color: rgba(2, 6, 23, 0.9);
+        }
+        [data-theme="light"] .ai-message {
+            background-color: rgba(15, 23, 42, 0.04);
+            border-color: rgba(15, 23, 42, 0.10);
+            color: rgba(2, 6, 23, 0.9);
         }
         .view-section {
             transition: opacity 0.2s;
@@ -159,6 +172,11 @@
             border-radius: 12px;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
             background: #300a24;
+        }
+
+        [data-theme="light"] #terminals-container > div {
+            border-color: rgba(2, 6, 23, 0.12);
+            box-shadow: 0 10px 30px rgba(2, 6, 23, 0.10);
         }
 
         /* Make the xterm area blend with the chrome */
