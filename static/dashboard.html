@@ -883,7 +883,7 @@
                     <div id="notes-editor-pane" class="min-h-0 flex flex-col border-r border-gray-700">
                         <div class="px-3 py-2 text-xs text-gray-400 border-b border-gray-700 bg-gray-900/30 flex items-center justify-between">
                             <span>Editor</span>
-                            <button onclick="toggleNotesPane('editor')" class="text-gray-300 hover:text-white">Hide</button>
+                            <button id="notes-toggle-editor" onclick="toggleNotesPane('editor')" class="text-gray-300 hover:text-white">Hide</button>
                         </div>
                         <textarea id="notes-editor"
                             class="flex-grow min-h-0 w-full bg-gray-900 text-sm p-3 text-white outline-none font-mono"
@@ -892,7 +892,7 @@
                     <div id="notes-preview-pane" class="min-h-0 flex flex-col">
                         <div class="px-3 py-2 text-xs text-gray-400 border-b border-gray-700 bg-gray-900/30 flex items-center justify-between">
                             <span>Preview</span>
-                            <button onclick="toggleNotesPane('preview')" class="text-gray-300 hover:text-white">Hide</button>
+                            <button id="notes-toggle-preview" onclick="toggleNotesPane('preview')" class="text-gray-300 hover:text-white">Hide</button>
                         </div>
                         <div id="notes-preview" class="flex-grow min-h-0 overflow-y-auto prose prose-invert max-w-none p-4"></div>
                     </div>
@@ -2910,6 +2910,8 @@
             const editorPane = document.getElementById('notes-editor-pane');
             const previewPane = document.getElementById('notes-preview-pane');
             const main = document.getElementById('notes-main');
+            const toggleEditorBtn = document.getElementById('notes-toggle-editor');
+            const togglePreviewBtn = document.getElementById('notes-toggle-preview');
             if (!sidebar || !editorPane || !previewPane || !main) return;
 
             const sidebarHidden = localStorage.getItem('notes_sidebar_hidden_v1') === '1';
@@ -2924,6 +2926,9 @@
             const previewVisible = !previewHidden;
             main.classList.toggle('lg:grid-cols-2', editorVisible && previewVisible);
             main.classList.toggle('lg:grid-cols-1', !(editorVisible && previewVisible));
+
+            if (toggleEditorBtn) toggleEditorBtn.textContent = editorHidden ? 'Show' : 'Hide';
+            if (togglePreviewBtn) togglePreviewBtn.textContent = previewHidden ? 'Show' : 'Hide';
         }
 
         function toggleNotesSidebar() {
