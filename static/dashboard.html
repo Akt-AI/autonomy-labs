@@ -64,9 +64,13 @@
 
         /* Text utility overrides for light mode */
         [data-theme="light"] .text-white { color: var(--app-fg) !important; }
-        [data-theme="light"] .text-gray-300 { color: rgba(30, 41, 59, 0.9) !important; }
-        [data-theme="light"] .text-gray-400 { color: rgba(30, 41, 59, 0.72) !important; }
-        [data-theme="light"] .text-gray-500 { color: rgba(30, 41, 59, 0.6) !important; }
+        [data-theme="light"] .text-gray-300 { color: rgba(15, 23, 42, 0.92) !important; }
+        [data-theme="light"] .text-gray-400 { color: rgba(15, 23, 42, 0.78) !important; }
+        [data-theme="light"] .text-gray-500 { color: rgba(15, 23, 42, 0.66) !important; }
+        [data-theme="light"] .text-gray-200 { color: rgba(15, 23, 42, 0.96) !important; }
+
+        [data-theme="light"] a { color: #1d4ed8; }
+        [data-theme="light"] .prose a { color: #1d4ed8; }
 
         /* Inputs in light mode */
         [data-theme="light"] input,
@@ -642,6 +646,23 @@
                             </div>
                             <div id="settings-mcp-server-list" class="space-y-3"></div>
                         </div>
+
+                        <div class="pt-4 border-t border-gray-700">
+                            <div class="flex items-center justify-between gap-2 mb-2">
+                                <div class="font-semibold text-gray-200">Notes</div>
+                                <button onclick="saveUserNotes()"
+                                    class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs">Save</button>
+                            </div>
+                            <div class="text-xs text-gray-400 mb-2">Personal markdown notes (saved to Supabase).</div>
+                            <div class="grid grid-cols-1 gap-3">
+                                <textarea id="notes-editor" rows="8"
+                                    class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500 font-mono"
+                                    placeholder="# Notes..."></textarea>
+                                <div class="text-xs text-gray-400">Preview</div>
+                                <div id="notes-preview" class="prose prose-invert max-w-none bg-gray-900/40 border border-gray-700 rounded-lg p-3 overflow-auto"></div>
+                                <div id="notes-status" class="text-xs text-gray-500"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -1198,6 +1219,7 @@
                 }
 
                 loadProviders();
+                await initNotes();
                 await loadChatHistoryList();
                 createTerminalTab(); // Init first tab
                 applyTerminalLayout();
@@ -2575,6 +2597,47 @@
                 document.getElementById('chat-api-key').value = config.apiKey || '';
                 document.getElementById('chat-base-url').value = config.baseUrl || '';
                 document.getElementById('chat-model').value = config.model || '';
+            }
+        }
+
+        async function initNotes() {
+            const editor = document.getElementById('notes-editor');
+            const preview = document.getElementById('notes-preview');
+            const status = document.getElementById('notes-status');
+            if (!editor || !preview) return;
+
+            editor.addEventListener('input', () => {
+                renderMarkdownInto(preview, editor.value || '');
+                if (status) status.textContent = 'Not saved';
+            });
+
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return;
+                const { data, error } = await supabase.from('user_notes').select('content,updated_at').eq('user_id', user.id).maybeSingle();
+                if (error) throw error;
+                editor.value = data?.content || '';
+                renderMarkdownInto(preview, editor.value || '');
+                if (status) status.textContent = data?.updated_at ? `Loaded (${new Date(data.updated_at).toLocaleString()})` : 'No notes yet';
+            } catch (e) {
+                if (status) status.textContent = 'Notes table not configured yet.';
+                console.warn('Notes load failed', e);
+            }
+        }
+
+        async function saveUserNotes() {
+            const editor = document.getElementById('notes-editor');
+            const status = document.getElementById('notes-status');
+            if (!editor) return;
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return;
+                const content = editor.value || '';
+                const { error } = await supabase.from('user_notes').upsert({ user_id: user.id, content }, { onConflict: 'user_id' });
+                if (error) throw error;
+                if (status) status.textContent = `Saved (${new Date().toLocaleString()})`;
+            } catch (e) {
+                if (status) status.textContent = `Save failed: ${e?.message || e}`;
             }
         }
 
