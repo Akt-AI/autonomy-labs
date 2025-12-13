@@ -47,6 +47,34 @@
             background: var(--app-bg);
             color: var(--app-fg);
         }
+
+        /* Make core surfaces theme-aware (overrides Tailwind bg/text utilities where used) */
+        nav, footer {
+            background: var(--panel-bg) !important;
+            border-color: var(--border) !important;
+        }
+
+        /* Common background utility overrides for light mode */
+        [data-theme="light"] .bg-gray-900 { background-color: var(--panel-bg-2) !important; }
+        [data-theme="light"] .bg-gray-800 { background-color: var(--panel-bg) !important; }
+        [data-theme="light"] .bg-black { background-color: #0b1220 !important; }
+        [data-theme="light"] .border-gray-700 { border-color: var(--border) !important; }
+        [data-theme="light"] .border-gray-600 { border-color: var(--border) !important; }
+
+        /* Text utility overrides for light mode */
+        [data-theme="light"] .text-white { color: var(--app-fg) !important; }
+        [data-theme="light"] .text-gray-300 { color: rgba(51, 65, 85, 0.85) !important; }
+        [data-theme="light"] .text-gray-400 { color: rgba(51, 65, 85, 0.75) !important; }
+        [data-theme="light"] .text-gray-500 { color: rgba(51, 65, 85, 0.65) !important; }
+
+        /* Inputs in light mode */
+        [data-theme="light"] input,
+        [data-theme="light"] textarea,
+        [data-theme="light"] select {
+            background-color: #ffffff !important;
+            color: var(--app-fg) !important;
+            border-color: var(--border) !important;
+        }
         .view-section {
             transition: opacity 0.2s;
         }
@@ -334,7 +362,7 @@
     </style>
 </head>
 
-<body class="bg-gray-900 text-white h-screen flex flex-col overflow-hidden">
+<body class="h-screen flex flex-col overflow-hidden">
     <!-- Navbar -->
     <nav class="bg-gray-800 border-b border-gray-700 shrink-0">
         <div class="px-4 py-3 flex justify-between items-center">
