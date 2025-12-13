@@ -217,6 +217,28 @@ async def codex_mcp_list():
     except Exception:
         return {"servers": []}
 
+
+@app.get("/api/codex/login/status")
+async def codex_login_status():
+    """
+    Returns Codex CLI login status for device-auth based sessions.
+    """
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "codex",
+            "login",
+            "status",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        text = stdout.decode("utf-8", errors="ignore").strip()
+        # Current CLI prints: "Logged in using ChatGPT" when authenticated
+        logged_in = "Logged in" in text
+        return {"loggedIn": logged_in, "statusText": text}
+    except Exception as e:
+        return {"loggedIn": False, "statusText": str(e)}
+
 @app.websocket("/ws/terminal")
 async def websocket_terminal(websocket: WebSocket):
     await websocket.accept()

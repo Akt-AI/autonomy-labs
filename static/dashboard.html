@@ -2286,29 +2286,47 @@
             if (id) localStorage.setItem('codex_thread_id_v1', id);
         }
 
+        async function getCodexLoginStatus() {
+            try {
+                const res = await fetch('/api/codex/login/status');
+                if (!res.ok) return { loggedIn: false, statusText: `HTTP ${res.status}` };
+                return await res.json();
+            } catch (e) {
+                return { loggedIn: false, statusText: String(e?.message || e) };
+            }
+        }
+
         async function sendCodexSdkMessage(message) {
             const codex = getCodexSdkSettings();
             const apiKey = codex.apiKey || '';
             const baseUrl = codex.baseUrl || '';
             const model = document.getElementById('chat-model')?.value || '';
 
-            // If no API key is configured, kick off device auth in the terminal and stop.
-            // This avoids confusing 401s on the very first @codex message.
+            // Allow either API key auth OR device-auth via `codex login --device-auth`.
             if (!apiKey) {
-                addMessageToUI('user', message || '');
-                const tip = [
-                    "Codex needs authentication.",
-                    "",
-                    "Run device login in the terminal (use the Run button):",
-                    "```bash",
-                    "codex login --device-auth",
-                    "```",
-                    "",
-                    "Or paste an API key in Settings → Codex SDK.",
-                ].join("\n");
-                addMessageToUI('assistant', tip);
-                runInTerminal('codex login --device-auth\n', { preferScope: 'main', autoShow: true });
-                return;
+                const status = await getCodexLoginStatus();
+                if (!status.loggedIn) {
+                    addMessageToUI('user', message || '');
+                    const tip = [
+                        "Codex needs authentication.",
+                        "",
+                        "Run device login in the terminal (use the Run button):",
+                        "```bash",
+                        "codex login --device-auth",
+                        "```",
+                        "",
+                        "Or paste an API key in Settings → Codex SDK.",
+                        status.statusText ? `\nStatus: ${status.statusText}` : ""
+                    ].join("\n");
+                    addMessageToUI('assistant', tip);
+
+                    // Avoid looping: only auto-run once per browser session.
+                    if (sessionStorage.getItem('codex_device_auth_autoran_v1') !== '1') {
+                        sessionStorage.setItem('codex_device_auth_autoran_v1', '1');
+                        runInTerminal('codex login --device-auth\n', { preferScope: 'main', autoShow: true });
+                    }
+                    return;
+                }
             }
 
             addMessageToUI('user', message || '');
