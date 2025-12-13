@@ -161,6 +161,9 @@ async def codex_agent(request: CodexRequest):
 
     try:
         env = os.environ.copy()
+        # Prefer using the global `codex` binary so device-auth (`codex login --device-auth`)
+        # and `codex login status` share the same credential store.
+        env.setdefault("CODEX_PATH_OVERRIDE", "codex")
         if request.apiKey:
             env["CODEX_API_KEY"] = request.apiKey
             env["OPENAI_API_KEY"] = request.apiKey

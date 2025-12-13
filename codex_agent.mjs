@@ -1,4 +1,5 @@
 import { Codex } from "@openai/codex-sdk";
+import { spawnSync } from "child_process";
 
 function readStdin() {
   return new Promise((resolve, reject) => {
@@ -37,7 +38,15 @@ async function main() {
     process.env.OPENAI_API_BASE ||
     undefined;
 
+  const codexPathOverride = (() => {
+    const override = process.env.CODEX_PATH_OVERRIDE;
+    if (override) return override;
+    const probe = spawnSync("codex", ["--version"], { stdio: "ignore" });
+    return probe.status === 0 ? "codex" : undefined;
+  })();
+
   const codex = new Codex({
+    codexPathOverride,
     apiKey,
     baseUrl,
   });

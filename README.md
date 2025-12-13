@@ -1,5 +1,5 @@
 ---
-title: Autonomy Labs Sandbox
+title: Autonomy Labs
 emoji: 🚀
 colorFrom: blue
 colorTo: purple
@@ -7,7 +7,7 @@ sdk: docker
 pinned: false
 ---
 
-# Autonomy Labs Sandbox
+# Autonomy Labs
 
 A lightweight web UI for chat + autonomous mode + terminal tabs, backed by FastAPI and Supabase Auth/DB.
 
