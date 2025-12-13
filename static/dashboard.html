@@ -848,7 +848,7 @@
 
         <!-- Notes View -->
         <div id="notes-view" class="view-section hidden w-full h-full flex overflow-hidden bg-gray-900">
-            <div class="w-72 bg-gray-800 border-r border-gray-700 flex flex-col shrink-0">
+            <div id="notes-sidebar" class="w-72 bg-gray-800 border-r border-gray-700 flex flex-col shrink-0">
                 <div class="p-3 border-b border-gray-700 flex items-center justify-between gap-2">
                     <div class="font-semibold text-gray-200">Notes</div>
                     <div class="flex gap-2">
@@ -864,6 +864,12 @@
             <div class="flex-grow min-w-0 flex flex-col">
                 <div class="p-3 border-b border-gray-700 bg-gray-800 flex items-center justify-between gap-2">
                     <div class="flex items-center gap-2 min-w-0 flex-1">
+                        <button onclick="toggleNotesSidebar()" class="p-2 rounded hover:bg-gray-700 text-gray-300 transition inline-flex items-center justify-center"
+                            title="Toggle folders" aria-label="Toggle folders">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                            </svg>
+                        </button>
                         <input id="notes-title" type="text" placeholder="Title"
                             class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500" />
                     </div>
@@ -873,15 +879,21 @@
                         <button onclick="deleteActiveNote()" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-xs">Delete</button>
                     </div>
                 </div>
-                <div class="flex-grow min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-0">
-                    <div class="min-h-0 flex flex-col border-r border-gray-700">
-                        <div class="px-3 py-2 text-xs text-gray-400 border-b border-gray-700 bg-gray-900/30">Editor</div>
+                <div id="notes-main" class="flex-grow min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-0">
+                    <div id="notes-editor-pane" class="min-h-0 flex flex-col border-r border-gray-700">
+                        <div class="px-3 py-2 text-xs text-gray-400 border-b border-gray-700 bg-gray-900/30 flex items-center justify-between">
+                            <span>Editor</span>
+                            <button onclick="toggleNotesPane('editor')" class="text-gray-300 hover:text-white">Hide</button>
+                        </div>
                         <textarea id="notes-editor"
                             class="flex-grow min-h-0 w-full bg-gray-900 text-sm p-3 text-white outline-none font-mono"
                             placeholder="# Notes..."></textarea>
                     </div>
-                    <div class="min-h-0 flex flex-col">
-                        <div class="px-3 py-2 text-xs text-gray-400 border-b border-gray-700 bg-gray-900/30">Preview</div>
+                    <div id="notes-preview-pane" class="min-h-0 flex flex-col">
+                        <div class="px-3 py-2 text-xs text-gray-400 border-b border-gray-700 bg-gray-900/30 flex items-center justify-between">
+                            <span>Preview</span>
+                            <button onclick="toggleNotesPane('preview')" class="text-gray-300 hover:text-white">Hide</button>
+                        </div>
                         <div id="notes-preview" class="flex-grow min-h-0 overflow-y-auto prose prose-invert max-w-none p-4"></div>
                     </div>
                 </div>
@@ -1277,7 +1289,7 @@
             });
 
             if (mode === 'terminal' && activeTerminalId) setTimeout(() => fitTerm(activeTerminalId), 50);
-            if (mode === 'notes') setTimeout(() => { refreshNotesTree(); }, 0);
+            if (mode === 'notes') setTimeout(() => { applyNotesLayout(); refreshNotesTree(); }, 0);
 
             document.getElementById('mobile-menu').classList.add('hidden');
         }
@@ -2777,6 +2789,8 @@
             const { editor, preview } = getNotesInputs();
             if (!editor || !preview) return;
 
+            applyNotesLayout();
+
             editor.addEventListener('input', () => {
                 renderNotesPreview();
                 setNotesStatus('Not saved');
@@ -2889,6 +2903,47 @@
             } catch (e) {
                 setNotesStatus(`Delete failed: ${e?.message || e}`);
             }
+        }
+
+        function applyNotesLayout() {
+            const sidebar = document.getElementById('notes-sidebar');
+            const editorPane = document.getElementById('notes-editor-pane');
+            const previewPane = document.getElementById('notes-preview-pane');
+            const main = document.getElementById('notes-main');
+            if (!sidebar || !editorPane || !previewPane || !main) return;
+
+            const sidebarHidden = localStorage.getItem('notes_sidebar_hidden_v1') === '1';
+            const editorHidden = localStorage.getItem('notes_editor_hidden_v1') === '1';
+            const previewHidden = localStorage.getItem('notes_preview_hidden_v1') === '1';
+
+            sidebar.classList.toggle('hidden', sidebarHidden);
+            editorPane.classList.toggle('hidden', editorHidden);
+            previewPane.classList.toggle('hidden', previewHidden);
+
+            const editorVisible = !editorHidden;
+            const previewVisible = !previewHidden;
+            main.classList.toggle('lg:grid-cols-2', editorVisible && previewVisible);
+            main.classList.toggle('lg:grid-cols-1', !(editorVisible && previewVisible));
+        }
+
+        function toggleNotesSidebar() {
+            const key = 'notes_sidebar_hidden_v1';
+            const next = localStorage.getItem(key) === '1' ? '0' : '1';
+            localStorage.setItem(key, next);
+            applyNotesLayout();
+        }
+
+        function toggleNotesPane(which) {
+            const key = which === 'preview' ? 'notes_preview_hidden_v1' : 'notes_editor_hidden_v1';
+            const next = localStorage.getItem(key) === '1' ? '0' : '1';
+            localStorage.setItem(key, next);
+            // Ensure at least one pane remains visible
+            const editorHidden = localStorage.getItem('notes_editor_hidden_v1') === '1';
+            const previewHidden = localStorage.getItem('notes_preview_hidden_v1') === '1';
+            if (editorHidden && previewHidden) {
+                localStorage.setItem('notes_editor_hidden_v1', '0');
+            }
+            applyNotesLayout();
         }
 
         init();
