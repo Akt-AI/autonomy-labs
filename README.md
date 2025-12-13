@@ -64,3 +64,5 @@ docker run --rm -p 7860:7860 --env-file .env autonomy-labs
 
 - **Secrets**: don’t hardcode API keys in source. GitHub push protection will block pushes containing tokens.
 - **Terminal PTY**: the host/container must have PTY devices (`/dev/pts`) available for interactive terminals.
+- **Codex login (Hugging Face Spaces/web terminal)**: Spaces expose a single port, so localhost callback URLs (like `http://localhost:1455/auth/callback?...`) won’t work; use device auth: `codex login --device-auth` (alias: `codex-login`).
+- **Git over SSH (web terminal/Docker)**: the container auto-generates `~/.ssh/id_ed25519` on first start and prints the public key; add it to your Git provider, then use `git@github.com:ORG/REPO.git` URLs.
