@@ -872,6 +872,9 @@
                     <!-- Tab Items will be injected here -->
                 </div>
                 <div class="ml-auto flex items-center">
+                    <button onclick="copyActiveTerminalOutput()"
+                        class="px-2 py-2 text-gray-400 hover:text-white hover:bg-gray-700 transition"
+                        title="Copy terminal output">⧉</button>
                     <button onclick="setTerminalLayout('single')" id="layout-single"
                         class="px-2 py-2 text-gray-400 hover:text-white hover:bg-gray-700 transition"
                         title="Single pane">▢</button>
@@ -1461,6 +1464,7 @@
             const term = new Terminal({
                 convertEol: true,
                 fontSize: 14,
+                copyOnSelect: true,
                 cursorBlink: true,
                 fontFamily: '"Ubuntu Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
                 theme: {
@@ -1507,12 +1511,35 @@
             resizeObserver.observe(termDiv);
 
             terminals[id] = { term, fitAddon, ws, containerId, scope, resizeObserver };
+
+            // Mobile-friendly copy: double-tap terminal to copy all output.
+            termDiv.addEventListener('dblclick', async () => {
+                try {
+                    term.selectAll();
+                    const text = term.getSelection();
+                    term.clearSelection();
+                    if (text) await navigator.clipboard.writeText(text);
+                } catch { }
+            });
+
             if (scope === 'main') {
                 applyTerminalLayout();
             } else {
                 activateTerminalTab(id);
             }
             return id;
+        }
+
+        async function copyActiveTerminalOutput() {
+            const id = activeTerminalId;
+            const t = terminals[id];
+            if (!t || !t.term) return;
+            try {
+                t.term.selectAll();
+                const text = t.term.getSelection();
+                t.term.clearSelection();
+                if (text) await navigator.clipboard.writeText(text);
+            } catch { }
         }
 
         function activateTerminalTab(id) {
@@ -2298,6 +2325,36 @@
             }
         }
 
+        async function ensureCodexAuthenticated() {
+            const status = await getCodexLoginStatus();
+            if (status.loggedIn) return true;
+
+            const tip = [
+                "Codex needs authentication.",
+                "",
+                "Run device login in the terminal (use the Run button):",
+                "```bash",
+                "codex login --device-auth",
+                "```",
+                "",
+                "Then retry your message."
+            ].join("\n");
+            addMessageToUI('assistant', tip);
+
+            if (sessionStorage.getItem('codex_device_auth_autoran_v1') !== '1') {
+                sessionStorage.setItem('codex_device_auth_autoran_v1', '1');
+                runInTerminal('codex login --device-auth\n', { preferScope: 'main', autoShow: true });
+            }
+
+            // Poll for up to ~2 minutes so the next call can proceed without manual retry.
+            for (let i = 0; i < 24; i++) {
+                await new Promise((r) => setTimeout(r, 5000));
+                const next = await getCodexLoginStatus();
+                if (next.loggedIn) return true;
+            }
+            return false;
+        }
+
         async function sendCodexSdkMessage(message) {
             const codex = getCodexSdkSettings();
             const apiKey = codex.apiKey || '';
@@ -2307,6 +2364,10 @@
 
             // Allow either API key auth OR device-auth via `codex login --device-auth`.
             // Don't pre-emptively block when apiKey is empty; device-auth works without it.
+            if (!apiKey) {
+                const ok = await ensureCodexAuthenticated();
+                if (!ok) return;
+            }
 
             addMessageToUI('user', message || '');
             scrollToBottom();
