@@ -447,15 +447,6 @@
                             <button id="chat-mode-auto" onclick="setChatMode('autonomous')"
                                 class="px-2 py-1 text-xs rounded-md text-gray-200 hover:bg-white/10 transition">Autonomous</button>
                         </div>
-                        <button id="chat-terminal-toggle" onclick="toggleAgentTerminalCollapsed()"
-                            class="hidden md:inline-flex p-2 rounded-md text-gray-200 hover:bg-white/10 transition"
-                            title="Toggle autonomous terminal" aria-label="Toggle autonomous terminal">
-                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5h16v14H4V5z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 9l3 3-3 3" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 15h6" />
-                            </svg>
-                        </button>
                         <button onclick="toggleSettings()"
                             class="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-700 transition">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -604,6 +595,11 @@
                 <div id="chat-autonomous" class="hidden flex-grow min-h-0 flex flex-col">
                     <div id="agent-split-root" class="split-root">
                         <div id="agent-pane-chat" class="split-pane min-h-0 flex flex-col border-r border-gray-700 agent-pane-surface">
+                            <div id="agent-terminal-collapsed-bar" class="hidden px-3 py-2 border-b border-gray-700/70 flex items-center justify-end bg-gray-900/30">
+                                <button onclick="toggleAgentTerminalCollapsed()"
+                                    class="px-2 py-1 text-xs rounded-md text-gray-200 hover:bg-white/10 transition"
+                                    title="Show terminal">Show terminal</button>
+                            </div>
                             <div class="flex-grow min-h-0 overflow-hidden">
                                 <div id="agent-chat-history" class="h-full p-4 overflow-y-auto space-y-4">
                                     <div id="agent-empty-state" class="text-center text-gray-500 mt-10">
@@ -1349,6 +1345,7 @@
             const paneChat = document.getElementById('agent-pane-chat');
             const paneTerminal = document.getElementById('agent-pane-terminal');
             const divider = document.getElementById('agent-split-divider');
+            const bar = document.getElementById('agent-terminal-collapsed-bar');
             if (!paneChat || !paneTerminal || !divider) return;
             const key = 'agent_terminal_collapsed_v1';
 
@@ -1356,6 +1353,7 @@
             if (isCollapsed) {
                 paneTerminal.classList.remove('hidden');
                 divider.classList.remove('hidden');
+                if (bar) bar.classList.add('hidden');
                 const ratio = Number(localStorage.getItem('agent_split_ratio_v1')) || 0.48;
                 paneChat.style.flex = `0 0 ${Math.round(Math.max(0.2, Math.min(0.8, ratio)) * 1000) / 10}%`;
                 paneTerminal.style.flex = '1 1 auto';
@@ -1364,6 +1362,7 @@
             } else {
                 paneTerminal.classList.add('hidden');
                 divider.classList.add('hidden');
+                if (bar) bar.classList.remove('hidden');
                 paneChat.style.flex = '1 1 auto';
                 localStorage.setItem(key, '1');
             }
@@ -1374,7 +1373,6 @@
             const auto = document.getElementById('chat-autonomous');
             const btnChat = document.getElementById('chat-mode-chat');
             const btnAuto = document.getElementById('chat-mode-auto');
-            const terminalToggle = document.getElementById('chat-terminal-toggle');
             if (!standard || !auto) return;
             const m = mode === 'autonomous' ? 'autonomous' : 'chat';
 
@@ -1382,7 +1380,6 @@
             auto.classList.toggle('hidden', m !== 'autonomous');
             if (btnChat) btnChat.classList.toggle('bg-white/10', m === 'chat');
             if (btnAuto) btnAuto.classList.toggle('bg-white/10', m === 'autonomous');
-            if (terminalToggle) terminalToggle.classList.toggle('hidden', m !== 'autonomous');
 
             localStorage.setItem('chat_mode_v1', m);
             if (m === 'autonomous') {
