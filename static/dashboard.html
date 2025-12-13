@@ -383,18 +383,27 @@
 <body class="h-screen flex flex-col overflow-hidden">
     <!-- Navbar -->
     <nav class="bg-gray-800 border-b border-gray-700 shrink-0">
-        <div class="px-4 py-3 flex justify-between items-center">
-            <div class="text-xl font-bold text-blue-500 flex items-center gap-2">
+        <div class="px-4 py-3 flex items-center gap-3">
+            <!-- Left: brand + text nav -->
+            <div class="text-xl font-bold text-blue-500 flex items-center gap-2 shrink-0">
                 <span class="md:hidden cursor-pointer text-gray-400"
                     onclick="document.getElementById('mobile-menu').classList.toggle('hidden')">☰</span>
                 Sandbox
             </div>
-            <div class="hidden md:flex space-x-1">
+            <div class="hidden md:flex space-x-1 shrink-0">
                 <button onclick="switchMode('dashboard')"
                     class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition"
                     id="nav-dashboard">Dashboard</button>
                 <button onclick="switchMode('chat')"
                     class="px-3 py-1 rounded hover:bg-gray-700 text-gray-300 transition" id="nav-chat">Chat</button>
+            </div>
+            <!-- Center: welcome -->
+            <div class="hidden md:flex flex-1 justify-center min-w-0">
+                <div class="text-sm text-gray-400 truncate">Welcome to Sandbox</div>
+            </div>
+
+            <!-- Right: icons + user -->
+            <div class="flex items-center gap-2 min-w-0 ml-auto">
                 <button onclick="switchMode('terminal')"
                     class="p-2 rounded hover:bg-gray-700 text-gray-300 transition inline-flex items-center justify-center"
                     id="nav-terminal" title="Terminal" aria-label="Terminal">
@@ -417,8 +426,6 @@
                             d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
                 </button>
-            </div>
-            <div class="flex items-center gap-3 min-w-0">
                 <div id="user-badge" class="hidden md:flex flex-col items-end leading-tight min-w-0">
                     <div id="user-name" class="text-sm text-gray-200 font-medium truncate max-w-[20rem]"></div>
                     <div id="user-email" class="text-xs text-gray-400 truncate max-w-[20rem]"></div>
@@ -642,8 +649,8 @@
 
                     <!-- Input -->
                     <div class="p-3 bg-gray-800 border-t border-gray-700 shrink-0">
-                        <div id="chat-attachments" class="max-w-4xl mx-auto mb-2 hidden"></div>
-                        <div class="flex space-x-2 max-w-4xl mx-auto items-center">
+                        <div id="chat-attachments" class="max-w-5xl mx-auto mb-2 hidden"></div>
+                        <div class="flex space-x-2 max-w-5xl mx-auto items-center">
                             <textarea id="chat-input" rows="1"
                                 class="flex-grow bg-gray-700 px-3 py-2 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-32"
                                 placeholder="Message..."
