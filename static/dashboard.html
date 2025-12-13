@@ -88,6 +88,13 @@
             border-color: rgba(15, 23, 42, 0.10);
             color: rgba(2, 6, 23, 0.9);
         }
+
+        /* Dashboard cards/surfaces in light mode (Tailwind arbitrary opacity classes) */
+        [data-theme="light"] .bg-gray-800\\/60 { background-color: rgba(255, 255, 255, 0.92) !important; }
+        [data-theme="light"] .bg-gray-900\\/40 { background-color: rgba(15, 23, 42, 0.03) !important; }
+        [data-theme="light"] .bg-gray-900\\/30 { background-color: rgba(15, 23, 42, 0.03) !important; }
+
+        [data-theme="light"] .shadow-xl { box-shadow: 0 18px 45px rgba(2, 6, 23, 0.08) !important; }
         .view-section {
             transition: opacity 0.2s;
         }
@@ -2426,6 +2433,31 @@
                 opt.innerText = k;
                 select.appendChild(opt);
             });
+
+            const remembered = getRememberedProvider();
+            if (remembered && providerCache[remembered]) {
+                select.value = remembered;
+                loadSelectedProvider(remembered);
+            } else {
+                const keys = Object.keys(providerCache);
+                if (keys.length === 1) {
+                    select.value = keys[0];
+                    rememberActiveProvider(keys[0]);
+                    loadSelectedProvider(keys[0]);
+                }
+            }
+        }
+
+        function rememberActiveProvider(name) {
+            if (!name) {
+                localStorage.removeItem('active_provider_name_v1');
+                return;
+            }
+            localStorage.setItem('active_provider_name_v1', name);
+        }
+
+        function getRememberedProvider() {
+            return localStorage.getItem('active_provider_name_v1') || '';
         }
 
         async function loadProviders() {
@@ -2453,6 +2485,20 @@
                     opt.innerText = k;
                     select.appendChild(opt);
                 });
+
+                // Restore remembered provider selection if available
+                const remembered = getRememberedProvider();
+                if (remembered && providerCache[remembered]) {
+                    select.value = remembered;
+                    loadSelectedProvider(remembered);
+                } else if (!select.value) {
+                    const keys = Object.keys(providerCache);
+                    if (keys.length === 1) {
+                        select.value = keys[0];
+                        rememberActiveProvider(keys[0]);
+                        loadSelectedProvider(keys[0]);
+                    }
+                }
             } catch (e) {
                 if (!warnedProviderFallback) {
                     warnedProviderFallback = true;
@@ -2485,6 +2531,7 @@
                 if (error) throw error;
                 await loadProviders();
                 document.getElementById('saved-providers').value = name;
+                rememberActiveProvider(name);
             } catch (e) {
                 // Fallback to local storage if table isn't available.
                 const saved = JSON.parse(localStorage.getItem('chat_providers') || '{}');
@@ -2492,6 +2539,7 @@
                 localStorage.setItem('chat_providers', JSON.stringify(saved));
                 loadProvidersFromLocalStorage();
                 document.getElementById('saved-providers').value = name;
+                rememberActiveProvider(name);
             }
         }
 
@@ -2521,6 +2569,7 @@
 
         function loadSelectedProvider(name) {
             if (!name) return;
+            rememberActiveProvider(name);
             const config = providerCache[name];
             if (config) {
                 document.getElementById('chat-api-key').value = config.apiKey || '';
