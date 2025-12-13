@@ -650,17 +650,41 @@
                         <div class="pt-4 border-t border-gray-700">
                             <div class="flex items-center justify-between gap-2 mb-2">
                                 <div class="font-semibold text-gray-200">Notes</div>
-                                <button onclick="saveUserNotes()"
-                                    class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs">Save</button>
+                                <div class="flex gap-2">
+                                    <button onclick="createNotesFolder()"
+                                        class="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs">+ Folder</button>
+                                    <button onclick="createNotesDoc()"
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs">+ Note</button>
+                                    <button onclick="saveActiveNote()"
+                                        class="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs">Save</button>
+                                </div>
                             </div>
-                            <div class="text-xs text-gray-400 mb-2">Personal markdown notes (saved to Supabase).</div>
-                            <div class="grid grid-cols-1 gap-3">
-                                <textarea id="notes-editor" rows="8"
-                                    class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500 font-mono"
-                                    placeholder="# Notes..."></textarea>
-                                <div class="text-xs text-gray-400">Preview</div>
-                                <div id="notes-preview" class="prose prose-invert max-w-none bg-gray-900/40 border border-gray-700 rounded-lg p-3 overflow-auto"></div>
-                                <div id="notes-status" class="text-xs text-gray-500"></div>
+                            <div class="text-xs text-gray-400 mb-2">Markdown notes with folders (saved to Supabase).</div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div class="bg-gray-900/40 border border-gray-700 rounded-lg p-2 overflow-auto" style="max-height: 340px;">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <div class="text-xs text-gray-400">Folders</div>
+                                        <button onclick="refreshNotesTree()" class="text-xs text-gray-300 hover:text-white">↻</button>
+                                    </div>
+                                    <div id="notes-tree" class="text-sm space-y-1"></div>
+                                </div>
+                                <div class="space-y-2">
+                                    <input id="notes-title" type="text" placeholder="Title"
+                                        class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500" />
+                                    <textarea id="notes-editor" rows="8"
+                                        class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500 font-mono"
+                                        placeholder="# Notes..."></textarea>
+                                    <div class="text-xs text-gray-400">Preview</div>
+                                    <div id="notes-preview" class="prose prose-invert max-w-none bg-gray-900/40 border border-gray-700 rounded-lg p-3 overflow-auto" style="max-height: 180px;"></div>
+                                    <div class="flex items-center justify-between">
+                                        <div id="notes-status" class="text-xs text-gray-500"></div>
+                                        <div class="flex gap-2">
+                                            <button onclick="renameActiveNote()" class="text-xs text-gray-300 hover:text-white">Rename</button>
+                                            <button onclick="deleteActiveNote()" class="text-xs text-red-300 hover:text-red-200">Delete</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2600,44 +2624,254 @@
             }
         }
 
-        async function initNotes() {
-            const editor = document.getElementById('notes-editor');
-            const preview = document.getElementById('notes-preview');
+        // --- Notes (folders + markdown docs) ---
+        let notesItems = []; // flat items from DB
+        let activeNoteId = null;
+        let activeFolderId = null;
+
+        function setNotesStatus(msg) {
             const status = document.getElementById('notes-status');
+            if (status) status.textContent = msg || '';
+        }
+
+        function getNotesInputs() {
+            return {
+                title: document.getElementById('notes-title'),
+                editor: document.getElementById('notes-editor'),
+                preview: document.getElementById('notes-preview'),
+                tree: document.getElementById('notes-tree'),
+            };
+        }
+
+        function renderNotesPreview() {
+            const { editor, preview } = getNotesInputs();
             if (!editor || !preview) return;
+            renderMarkdownInto(preview, editor.value || '');
+        }
 
-            editor.addEventListener('input', () => {
-                renderMarkdownInto(preview, editor.value || '');
-                if (status) status.textContent = 'Not saved';
+        function buildNotesTree() {
+            const byParent = new Map();
+            notesItems.forEach((item) => {
+                const key = item.parent_id || 'root';
+                if (!byParent.has(key)) byParent.set(key, []);
+                byParent.get(key).push(item);
             });
+            byParent.forEach((arr) => arr.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || (a.title || '').localeCompare(b.title || '')));
+            return byParent;
+        }
 
+        function renderNotesTree() {
+            const { tree } = getNotesInputs();
+            if (!tree) return;
+            const byParent = buildNotesTree();
+
+            const makeNode = (item, depth) => {
+                const row = document.createElement('div');
+                row.className = 'flex items-center gap-2 py-1 px-2 rounded hover:bg-white/10';
+                row.style.marginLeft = `${depth * 10}px`;
+
+                const icon = document.createElement('span');
+                icon.className = 'text-gray-400';
+                icon.textContent = item.kind === 'folder' ? '▸' : '📝';
+
+                const name = document.createElement('button');
+                name.type = 'button';
+                name.className = 'flex-grow text-left truncate';
+                name.textContent = item.title || (item.kind === 'folder' ? 'Untitled folder' : 'Untitled note');
+                name.onclick = () => {
+                    if (item.kind === 'folder') {
+                        activeFolderId = item.id;
+                        // Keep active note selection if inside folder; otherwise clear note selection.
+                        setNotesStatus(`Folder: ${item.title || 'Untitled'}`);
+                        renderNotesTree();
+                    } else {
+                        openNote(item.id);
+                    }
+                };
+
+                const actions = document.createElement('div');
+                actions.className = 'flex gap-1 shrink-0 opacity-0 hover:opacity-100';
+
+                const del = document.createElement('button');
+                del.type = 'button';
+                del.className = 'text-xs text-red-300 hover:text-red-200';
+                del.textContent = 'Del';
+                del.onclick = (e) => { e.stopPropagation(); deleteNoteItem(item.id); };
+
+                actions.appendChild(del);
+
+                row.appendChild(icon);
+                row.appendChild(name);
+                row.appendChild(actions);
+                return row;
+            };
+
+            const renderBranch = (parentKey, depth) => {
+                const items = byParent.get(parentKey) || [];
+                const frag = document.createDocumentFragment();
+                items.forEach((item) => {
+                    const row = makeNode(item, depth);
+                    if (item.id === activeFolderId || item.id === activeNoteId) row.classList.add('bg-white/10');
+                    frag.appendChild(row);
+                    if (item.kind === 'folder') {
+                        // simple always-expanded tree
+                        frag.appendChild(renderBranch(item.id, depth + 1));
+                    }
+                });
+                return frag;
+            };
+
+            tree.innerHTML = '';
+            tree.appendChild(renderBranch('root', 0));
+        }
+
+        async function refreshNotesTree() {
             try {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) return;
-                const { data, error } = await supabase.from('user_notes').select('content,updated_at').eq('user_id', user.id).maybeSingle();
+                const { data, error } = await supabase
+                    .from('note_items')
+                    .select('id,user_id,parent_id,kind,title,content,sort_order,updated_at')
+                    .eq('user_id', user.id)
+                    .order('sort_order', { ascending: true })
+                    .order('title', { ascending: true });
                 if (error) throw error;
-                editor.value = data?.content || '';
-                renderMarkdownInto(preview, editor.value || '');
-                if (status) status.textContent = data?.updated_at ? `Loaded (${new Date(data.updated_at).toLocaleString()})` : 'No notes yet';
+                notesItems = data || [];
+                renderNotesTree();
             } catch (e) {
-                if (status) status.textContent = 'Notes table not configured yet.';
+                setNotesStatus('Notes table not configured yet.');
                 console.warn('Notes load failed', e);
             }
         }
 
-        async function saveUserNotes() {
-            const editor = document.getElementById('notes-editor');
-            const status = document.getElementById('notes-status');
-            if (!editor) return;
+        function openNote(id) {
+            const { title, editor } = getNotesInputs();
+            const note = notesItems.find((n) => n.id === id && n.kind === 'note');
+            if (!note || !title || !editor) return;
+            activeNoteId = id;
+            activeFolderId = note.parent_id || null;
+            title.value = note.title || '';
+            editor.value = note.content || '';
+            renderNotesPreview();
+            setNotesStatus(note.updated_at ? `Loaded (${new Date(note.updated_at).toLocaleString()})` : 'Loaded');
+            renderNotesTree();
+        }
+
+        async function initNotes() {
+            const { editor, preview } = getNotesInputs();
+            if (!editor || !preview) return;
+
+            editor.addEventListener('input', () => {
+                renderNotesPreview();
+                setNotesStatus('Not saved');
+            });
+            const titleEl = document.getElementById('notes-title');
+            if (titleEl) {
+                titleEl.addEventListener('input', () => setNotesStatus('Not saved'));
+            }
+
+            await refreshNotesTree();
+            // Auto-open most recently updated note if any
+            const latest = notesItems.filter(i => i.kind === 'note').sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))[0];
+            if (latest) openNote(latest.id);
+        }
+
+        async function createNotesFolder() {
+            const name = prompt('Folder name:');
+            if (!name) return;
             try {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) return;
-                const content = editor.value || '';
-                const { error } = await supabase.from('user_notes').upsert({ user_id: user.id, content }, { onConflict: 'user_id' });
+                const { error } = await supabase.from('note_items').insert({
+                    user_id: user.id,
+                    parent_id: activeFolderId || null,
+                    kind: 'folder',
+                    title: name,
+                    content: '',
+                    sort_order: 0
+                });
                 if (error) throw error;
-                if (status) status.textContent = `Saved (${new Date().toLocaleString()})`;
+                await refreshNotesTree();
+                setNotesStatus('Folder created');
             } catch (e) {
-                if (status) status.textContent = `Save failed: ${e?.message || e}`;
+                setNotesStatus(`Create failed: ${e?.message || e}`);
+            }
+        }
+
+        async function createNotesDoc() {
+            const name = prompt('Note title:');
+            if (!name) return;
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return;
+                const { data, error } = await supabase.from('note_items').insert({
+                    user_id: user.id,
+                    parent_id: activeFolderId || null,
+                    kind: 'note',
+                    title: name,
+                    content: '',
+                    sort_order: 0
+                }).select().single();
+                if (error) throw error;
+                await refreshNotesTree();
+                if (data?.id) openNote(data.id);
+                setNotesStatus('Note created');
+            } catch (e) {
+                setNotesStatus(`Create failed: ${e?.message || e}`);
+            }
+        }
+
+        async function saveActiveNote() {
+            const { title, editor } = getNotesInputs();
+            if (!title || !editor) return;
+            if (!activeNoteId) {
+                await createNotesDoc();
+                return;
+            }
+            try {
+                const { error } = await supabase.from('note_items').update({
+                    title: title.value || '',
+                    content: editor.value || ''
+                }).eq('id', activeNoteId);
+                if (error) throw error;
+                await refreshNotesTree();
+                setNotesStatus(`Saved (${new Date().toLocaleString()})`);
+            } catch (e) {
+                setNotesStatus(`Save failed: ${e?.message || e}`);
+            }
+        }
+
+        async function renameActiveNote() {
+            if (!activeNoteId) return;
+            const { title } = getNotesInputs();
+            const name = prompt('New title:', title?.value || '');
+            if (!name) return;
+            if (title) title.value = name;
+            await saveActiveNote();
+        }
+
+        async function deleteActiveNote() {
+            if (!activeNoteId) return;
+            await deleteNoteItem(activeNoteId);
+        }
+
+        async function deleteNoteItem(id) {
+            const item = notesItems.find((n) => n.id === id);
+            if (!item) return;
+            if (!confirm(`Delete "${item.title || 'Untitled'}"? This deletes children too.`)) return;
+            try {
+                const { error } = await supabase.from('note_items').delete().eq('id', id);
+                if (error) throw error;
+                if (activeNoteId === id) activeNoteId = null;
+                if (activeFolderId === id) activeFolderId = null;
+                const { title, editor } = getNotesInputs();
+                if (title) title.value = '';
+                if (editor) editor.value = '';
+                renderNotesPreview();
+                await refreshNotesTree();
+                setNotesStatus('Deleted');
+            } catch (e) {
+                setNotesStatus(`Delete failed: ${e?.message || e}`);
             }
         }
 
