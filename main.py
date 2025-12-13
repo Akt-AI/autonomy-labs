@@ -187,6 +187,33 @@ async def codex_agent(request: CodexRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.get("/api/codex/mcp")
+async def codex_mcp_list():
+    """
+    Lists configured Codex MCP servers by shelling out to `codex mcp list`.
+    """
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "codex",
+            "mcp",
+            "list",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode != 0:
+            return {"servers": []}
+        text = stdout.decode("utf-8", errors="ignore")
+        servers = []
+        for line in text.splitlines():
+            name = (line.split() or [""])[0].strip()
+            if name and name.lower() != "name":
+                servers.append(name)
+        return {"servers": servers}
+    except Exception:
+        return {"servers": []}
+
 @app.websocket("/ws/terminal")
 async def websocket_terminal(websocket: WebSocket):
     await websocket.accept()

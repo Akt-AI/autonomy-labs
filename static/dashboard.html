@@ -647,6 +647,32 @@
 
                         <div class="pt-4 border-t border-gray-700">
                             <div class="flex items-center justify-between gap-2 mb-2">
+                                <div class="font-semibold text-gray-200">Codex SDK</div>
+                                <button onclick="refreshCodexMcpServers()"
+                                    class="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs">List MCP</button>
+                            </div>
+                            <div class="text-xs text-gray-400 mb-2">
+                                Uses OpenAI Codex SDK locally (separate from your chat provider settings). Device auth is available in the terminal: <code>codex login --device-auth</code>.
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Codex Base URL</label>
+                                    <input type="text" id="codex-base-url" placeholder="https://api.openai.com/v1"
+                                        class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500"
+                                        onchange="saveCodexSdkSettings()">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Codex API Key</label>
+                                    <input type="password" id="codex-api-key" placeholder="sk-..."
+                                        class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500"
+                                        onchange="saveCodexSdkSettings()">
+                                </div>
+                            </div>
+                            <div id="codex-mcp-list" class="mt-3 text-xs text-gray-400"></div>
+                        </div>
+
+                        <div class="pt-4 border-t border-gray-700">
+                            <div class="flex items-center justify-between gap-2 mb-2">
                                 <div class="font-semibold text-gray-200">MCP</div>
                                 <button onclick="addMcpServerPrompt()"
                                     class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs">+ Add</button>
@@ -1192,6 +1218,33 @@
             if (el) el.checked = !!allowed;
         }
 
+        function getCodexSdkSettings() {
+            return {
+                baseUrl: localStorage.getItem('codex_sdk_base_url_v1') || '',
+                apiKey: localStorage.getItem('codex_sdk_api_key_v1') || '',
+            };
+        }
+
+        function saveCodexSdkSettings() {
+            const baseUrl = document.getElementById('codex-base-url')?.value || '';
+            const apiKey = document.getElementById('codex-api-key')?.value || '';
+            localStorage.setItem('codex_sdk_base_url_v1', baseUrl.trim());
+            localStorage.setItem('codex_sdk_api_key_v1', apiKey);
+        }
+
+        async function refreshCodexMcpServers() {
+            const out = document.getElementById('codex-mcp-list');
+            if (out) out.textContent = 'Loading...';
+            try {
+                const res = await fetch('/api/codex/mcp');
+                const data = await res.json();
+                const names = Array.isArray(data?.servers) ? data.servers : [];
+                if (out) out.textContent = names.length ? `Configured: ${names.join(', ')}` : 'No MCP servers configured.';
+            } catch (e) {
+                if (out) out.textContent = `Failed to list MCP servers: ${e?.message || e}`;
+            }
+        }
+
         async function init() {
             try {
                 const res = await fetch('/config');
@@ -1215,6 +1268,13 @@
                 // Access preferences
                 if (localStorage.getItem('auth_allow_signup_v1') == null) {
                     localStorage.setItem('auth_allow_signup_v1', '0');
+                }
+                // Codex SDK defaults (separate from chat provider)
+                if (localStorage.getItem('codex_sdk_base_url_v1') == null) {
+                    localStorage.setItem('codex_sdk_base_url_v1', 'https://api.openai.com/v1');
+                }
+                if (localStorage.getItem('codex_sdk_api_key_v1') == null) {
+                    localStorage.setItem('codex_sdk_api_key_v1', '');
                 }
 
                 // Logged-in user badge (email + username)
@@ -1253,6 +1313,13 @@
                 // Chat bar quick controls
                 setChatAgentTarget(getChatAgentTarget());
                 syncQuickModelFromSettings();
+
+                // Codex SDK settings UI
+                const codexSettings = getCodexSdkSettings();
+                const codexBase = document.getElementById('codex-base-url');
+                const codexKey = document.getElementById('codex-api-key');
+                if (codexBase) codexBase.value = codexSettings.baseUrl;
+                if (codexKey) codexKey.value = codexSettings.apiKey;
 
                 // Multi-modal attachments
                 const chatFile = document.getElementById('chat-file-input');
@@ -2220,8 +2287,9 @@
         }
 
         async function sendCodexSdkMessage(message) {
-            const apiKey = document.getElementById('chat-api-key')?.value || '';
-            const baseUrl = document.getElementById('chat-base-url')?.value || '';
+            const codex = getCodexSdkSettings();
+            const apiKey = codex.apiKey || '';
+            const baseUrl = codex.baseUrl || '';
             const model = document.getElementById('chat-model')?.value || '';
 
             addMessageToUI('user', message || '');
@@ -2241,7 +2309,6 @@
                         sandboxMode: 'read-only',
                         approvalPolicy: 'never',
                         modelReasoningEffort: 'minimal',
-                        // Prefer configured OpenAI-compatible creds if present; codex-sdk also reads env vars.
                         apiKey: apiKey || null,
                         baseUrl: baseUrl || null
                     })
@@ -2606,6 +2673,10 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ apiKey, baseUrl })
             });
+            if (!res.ok) {
+                if (!quiet) alert(`Failed to fetch models: HTTP ${res.status}`);
+                return;
+            }
             const data = await res.json();
             const list = document.getElementById('model-list');
             if (!list) return;
