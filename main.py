@@ -164,10 +164,12 @@ async def codex_agent(request: CodexRequest):
         # Prefer using the global `codex` binary so device-auth (`codex login --device-auth`)
         # and `codex login status` share the same credential store.
         env.setdefault("CODEX_PATH_OVERRIDE", "codex")
+        # If apiKey is not provided, assume device-auth and avoid setting API base URLs that
+        # could force API-key auth codepaths and cause 401s.
         if request.apiKey:
             env["CODEX_API_KEY"] = request.apiKey
             env["OPENAI_API_KEY"] = request.apiKey
-        if request.baseUrl:
+        if request.apiKey and request.baseUrl:
             env["OPENAI_BASE_URL"] = request.baseUrl
 
         proc = await asyncio.create_subprocess_exec(

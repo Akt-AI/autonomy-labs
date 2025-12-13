@@ -1271,7 +1271,9 @@
                 }
                 // Codex SDK defaults (separate from chat provider)
                 if (localStorage.getItem('codex_sdk_base_url_v1') == null) {
-                    localStorage.setItem('codex_sdk_base_url_v1', 'https://api.openai.com/v1');
+                    // Leave blank by default. For device-auth, Codex CLI uses its own auth flow
+                    // and default endpoints; setting a base URL without an API key can cause 401s.
+                    localStorage.setItem('codex_sdk_base_url_v1', '');
                 }
                 if (localStorage.getItem('codex_sdk_api_key_v1') == null) {
                     localStorage.setItem('codex_sdk_api_key_v1', '');
@@ -2299,7 +2301,8 @@
         async function sendCodexSdkMessage(message) {
             const codex = getCodexSdkSettings();
             const apiKey = codex.apiKey || '';
-            const baseUrl = codex.baseUrl || '';
+            // Only pass baseUrl when using API key auth; device-auth should rely on Codex defaults.
+            const baseUrl = apiKey ? (codex.baseUrl || '') : '';
             const model = document.getElementById('chat-model')?.value || '';
 
             // Allow either API key auth OR device-auth via `codex login --device-auth`.
