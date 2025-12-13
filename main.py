@@ -195,6 +195,84 @@ async def codex_agent(request: CodexRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/codex/cli")
+async def codex_agent_cli(request: CodexRequest):
+    """
+    Runs Codex directly via the CLI (`codex exec --experimental-json`) and extracts the final agent message.
+
+    This avoids SDK/CLI mismatches and uses the same device-auth session as `codex login --device-auth`.
+    """
+    if not request.message.strip():
+        raise HTTPException(status_code=400, detail="Message is required")
+
+    base_args = ["codex", "exec", "--experimental-json", "--sandbox", request.sandboxMode or "read-only"]
+    # Map approval policy into config (CLI flag differs between interactive and exec; config works everywhere).
+    if request.approvalPolicy:
+        base_args += ["--config", f'approval_policy="{request.approvalPolicy}"']
+    # Optional model
+    if request.model:
+        base_args += ["--model", request.model]
+    # Run inside app dir; allow even if not a git repo (Spaces copies are git, but keep safe)
+    base_args += ["--cd", os.path.dirname(__file__), "--skip-git-repo-check"]
+
+    # Resume existing thread if provided
+    if request.threadId:
+        base_args += ["resume", request.threadId]
+
+    env = os.environ.copy()
+    if request.apiKey:
+        env["OPENAI_API_KEY"] = request.apiKey
+        env["CODEX_API_KEY"] = request.apiKey
+        if request.baseUrl:
+            env["OPENAI_BASE_URL"] = request.baseUrl
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *base_args,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+        )
+        stdout, stderr = await proc.communicate(request.message.encode("utf-8"))
+
+        if proc.returncode != 0:
+            err_text = (stderr.decode("utf-8", errors="ignore") or "").strip()
+            if "401 Unauthorized" in err_text or "status 401" in err_text:
+                raise HTTPException(status_code=401, detail=err_text or "Unauthorized")
+            raise HTTPException(status_code=500, detail=err_text or "Codex CLI failed")
+
+        thread_id = None
+        final_text = ""
+        usage = None
+        for line in stdout.decode("utf-8", errors="ignore").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except Exception:
+                continue
+            if event.get("type") == "thread.started":
+                thread_id = event.get("thread_id") or thread_id
+            if event.get("type") == "item.completed":
+                item = event.get("item") or {}
+                if item.get("type") == "agent_message":
+                    final_text = item.get("text") or final_text
+            if event.get("type") == "turn.completed":
+                usage = event.get("usage") or usage
+            if event.get("type") == "turn.failed":
+                err = (event.get("error") or {}).get("message") or "Codex turn failed"
+                if "401" in err:
+                    raise HTTPException(status_code=401, detail=err)
+                raise HTTPException(status_code=500, detail=err)
+
+        return {"threadId": thread_id or request.threadId, "finalResponse": final_text, "usage": usage}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/codex/mcp")
 async def codex_mcp_list():

@@ -2315,7 +2315,7 @@
             aiMsgEl.innerHTML = '';
 
             try {
-                const res = await fetch('/api/codex', {
+                const res = await fetch('/api/codex/cli', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
