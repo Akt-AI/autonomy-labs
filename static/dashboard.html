@@ -136,6 +136,27 @@
             background: #1a1b26;
             border-radius: 0.5rem;
             position: relative;
+            overflow-x: auto;
+        }
+
+        /* Ensure code is always readable (prose/prose-invert can override colors). */
+        .chat-message pre code {
+            color: #e5e7eb !important;
+            background: transparent !important;
+            font-size: 0.9em;
+        }
+
+        .chat-message :not(pre) > code {
+            color: #e5e7eb;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            padding: 0.1rem 0.3rem;
+            border-radius: 0.35rem;
+        }
+
+        .chat-message pre code .hljs-comment,
+        .chat-message pre code .hljs-quote {
+            color: #9ca3af;
         }
 
         .copy-btn {
