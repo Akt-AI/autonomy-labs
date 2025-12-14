@@ -29,6 +29,14 @@ persist_codex_dir_if_possible() {
   echo "[codex] Using persistent config dir: ${codex_home} -> ${persistent_codex}"
 }
 
+ensure_codex_home_permissions() {
+  local codex_home="${HOME}/.codex"
+  mkdir -p "${codex_home}/sessions" "${codex_home}/logs" 2>/dev/null || true
+  chmod 700 "${codex_home}" 2>/dev/null || true
+  # Ensure the current user can write (handles cases where files were created as another user).
+  chown -R "$(id -u)":"$(id -g)" "${codex_home}" 2>/dev/null || true
+}
+
 ensure_ssh_keypair() {
   local ssh_dir="${HOME}/.ssh"
   local key_path="${ssh_dir}/id_ed25519"
@@ -60,6 +68,7 @@ EOF
 
 if command -v ssh-keygen >/dev/null 2>&1; then
   persist_codex_dir_if_possible
+  ensure_codex_home_permissions
   ensure_ssh_keypair
 else
   echo "[git ssh] ssh-keygen not found; install openssh-client to enable SSH key generation." >&2

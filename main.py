@@ -242,9 +242,11 @@ async def codex_agent_cli(request: CodexRequest):
 
         err_text = (stderr.decode("utf-8", errors="ignore") or "").strip()
         if proc.returncode != 0:
-            if "401 Unauthorized" in err_text or "status 401" in err_text:
-                raise HTTPException(status_code=401, detail=err_text or "Unauthorized")
-            raise HTTPException(status_code=500, detail=err_text or "Codex CLI failed")
+            out_text = (stdout.decode("utf-8", errors="ignore") or "").strip()
+            detail = err_text or out_text or "Codex CLI failed"
+            if "401 Unauthorized" in detail or "status 401" in detail:
+                raise HTTPException(status_code=401, detail=detail)
+            raise HTTPException(status_code=500, detail=detail)
 
         thread_id = None
         final_text = ""
@@ -279,6 +281,10 @@ async def codex_agent_cli(request: CodexRequest):
                 raise HTTPException(status_code=401, detail=err_text)
             if "Error:" in err_text or "Fatal error" in err_text:
                 raise HTTPException(status_code=500, detail=err_text)
+        if not saw_event and not final_text:
+            out_text = (stdout.decode("utf-8", errors="ignore") or "").strip()
+            if out_text:
+                raise HTTPException(status_code=500, detail=out_text)
 
         return {"threadId": thread_id or request.threadId, "finalResponse": final_text, "usage": usage}
     except HTTPException:
