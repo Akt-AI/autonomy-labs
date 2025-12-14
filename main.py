@@ -15,6 +15,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from openai import OpenAI
 import json
+import uuid
+from dataclasses import dataclass, field
 
 load_dotenv()
 
@@ -353,6 +355,212 @@ async def codex_login_status():
         return {"loggedIn": logged_in, "statusText": text or err, "exitCode": proc.returncode}
     except Exception as e:
         return {"loggedIn": False, "statusText": str(e), "exitCode": None}
+
+
+@dataclass
+class DeviceLoginAttempt:
+    id: str
+    proc: asyncio.subprocess.Process
+    created_at: float
+    url: Optional[str] = None
+    code: Optional[str] = None
+    output: List[str] = field(default_factory=list)
+    done: bool = False
+    returncode: Optional[int] = None
+
+
+app.state.device_login_attempts: dict[str, DeviceLoginAttempt] = {}
+app.state.device_login_lock = asyncio.Lock()
+
+class McpStdioClient:
+    def __init__(self, command: List[str]):
+        self.command = command
+        self.proc: Optional[asyncio.subprocess.Process] = None
+        self._lock = asyncio.Lock()
+        self._pending: dict[int, asyncio.Future] = {}
+        self._next_id = 1
+        self._reader_task: Optional[asyncio.Task] = None
+        self._initialized = False
+
+    async def start(self) -> None:
+        if self.proc and self.proc.returncode is None:
+            return
+        self.proc = await asyncio.create_subprocess_exec(
+            *self.command,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        self._initialized = False
+        self._reader_task = asyncio.create_task(self._reader())
+        await self._initialize()
+
+    async def _reader(self) -> None:
+        assert self.proc and self.proc.stdout
+        while True:
+            line = await self.proc.stdout.readline()
+            if not line:
+                break
+            text = line.decode("utf-8", errors="ignore").strip()
+            if not text:
+                continue
+            try:
+                msg = json.loads(text)
+            except Exception:
+                continue
+            msg_id = msg.get("id")
+            if msg_id is None:
+                continue
+            fut = self._pending.pop(int(msg_id), None)
+            if fut and not fut.done():
+                fut.set_result(msg)
+
+    async def _rpc(self, method: str, params: Optional[dict] = None) -> dict:
+        await self.start()
+        assert self.proc and self.proc.stdin
+        async with self._lock:
+            msg_id = self._next_id
+            self._next_id += 1
+            loop = asyncio.get_running_loop()
+            fut: asyncio.Future = loop.create_future()
+            self._pending[msg_id] = fut
+            payload = {"jsonrpc": "2.0", "id": msg_id, "method": method}
+            if params is not None:
+                payload["params"] = params
+            self.proc.stdin.write((json.dumps(payload) + "\n").encode("utf-8"))
+            await self.proc.stdin.drain()
+        resp = await asyncio.wait_for(fut, timeout=600.0)
+        if "error" in resp:
+            raise HTTPException(status_code=500, detail=resp["error"])
+        return resp.get("result") or {}
+
+    async def _initialize(self) -> None:
+        if self._initialized:
+            return
+        # minimal initialize; codex mcp-server advertises tools
+        result = await self._rpc(
+            "initialize",
+            {
+                "protocolVersion": "2024-11-05",
+                "clientInfo": {"name": "autonomy-labs", "version": "1.0"},
+                "capabilities": {},
+            },
+        )
+        # Notify initialized (no response)
+        assert self.proc and self.proc.stdin
+        self.proc.stdin.write(
+            (json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n").encode("utf-8")
+        )
+        await self.proc.stdin.drain()
+        self._initialized = True
+        _ = result
+
+    async def list_tools(self) -> dict:
+        return await self._rpc("tools/list", {})
+
+    async def call_tool(self, name: str, arguments: dict) -> dict:
+        return await self._rpc("tools/call", {"name": name, "arguments": arguments})
+
+
+app.state.codex_mcp_client = McpStdioClient(["codex", "mcp-server"])
+
+
+async def _read_device_login_output(attempt: DeviceLoginAttempt) -> None:
+    try:
+        assert attempt.proc.stdout is not None
+        while True:
+            line = await attempt.proc.stdout.readline()
+            if not line:
+                break
+            text = line.decode("utf-8", errors="ignore").rstrip("\n")
+            attempt.output.append(text)
+            # Parse link/code from Codex output
+            if attempt.url is None and "https://" in text and "auth.openai.com/codex/device" in text:
+                attempt.url = "https://auth.openai.com/codex/device"
+            if attempt.code is None:
+                # device code looks like XXXX-YYYYY
+                stripped = text.strip()
+                if len(stripped) >= 9 and "-" in stripped and stripped.replace("-", "").isalnum():
+                    # avoid grabbing random lines
+                    if stripped.count("-") == 1 and 4 <= len(stripped.split("-")[0]) <= 6:
+                        attempt.code = stripped
+        await attempt.proc.wait()
+    finally:
+        attempt.done = True
+        attempt.returncode = attempt.proc.returncode
+
+
+@app.post("/api/codex/login/device/start")
+async def codex_login_device_start():
+    """
+    Starts `codex login --device-auth` and returns the device URL + code (when available).
+    """
+    async with app.state.device_login_lock:
+        proc = await asyncio.create_subprocess_exec(
+            "codex",
+            "login",
+            "--device-auth",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        attempt_id = str(uuid.uuid4())
+        attempt = DeviceLoginAttempt(
+            id=attempt_id,
+            proc=proc,
+            created_at=asyncio.get_running_loop().time(),
+        )
+        app.state.device_login_attempts[attempt_id] = attempt
+        asyncio.create_task(_read_device_login_output(attempt))
+        return {"loginId": attempt_id}
+
+
+@app.get("/api/codex/login/device/status")
+async def codex_login_device_status(loginId: str):
+    attempt = app.state.device_login_attempts.get(loginId)
+    if not attempt:
+        raise HTTPException(status_code=404, detail="Unknown loginId")
+
+    # keep last ~50 lines
+    tail = attempt.output[-50:]
+    status = "pending"
+    if attempt.done:
+        status = "success" if attempt.returncode == 0 else "failed"
+    return {
+        "loginId": attempt.id,
+        "status": status,
+        "url": attempt.url,
+        "code": attempt.code,
+        "outputTail": tail,
+        "returnCode": attempt.returncode,
+    }
+
+
+@app.get("/api/mcp/tools")
+async def mcp_tools_list():
+    """
+    List tools available from the local Codex MCP server (`codex mcp-server`).
+    """
+    try:
+        result = await app.state.codex_mcp_client.list_tools()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class McpCallRequest(BaseModel):
+    name: str
+    arguments: dict
+
+
+@app.post("/api/mcp/call")
+async def mcp_tools_call(request: McpCallRequest):
+    """
+    Call a tool on the local Codex MCP server (`codex mcp-server`).
+    """
+    try:
+        return await app.state.codex_mcp_client.call_tool(request.name, request.arguments)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.websocket("/ws/terminal")
 async def websocket_terminal(websocket: WebSocket):

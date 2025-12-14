@@ -2354,26 +2354,43 @@
             const status = await getCodexLoginStatus();
             if (status.loggedIn) return true;
 
+            // Kick off device-auth via API so mobile users don't need terminal.
+            let loginId = sessionStorage.getItem('codex_device_login_id_v1') || '';
+            if (!loginId) {
+                try {
+                    const startRes = await fetch('/api/codex/login/device/start', { method: 'POST' });
+                    const start = await startRes.json();
+                    loginId = start?.loginId || '';
+                    if (loginId) sessionStorage.setItem('codex_device_login_id_v1', loginId);
+                } catch { }
+            }
+
             const tip = [
                 "Codex needs authentication.",
                 "",
-                "Run device login in the terminal (use the Run button):",
-                "```bash",
-                "codex login --device-auth",
-                "```",
+                "Complete device login:",
+                "- Open: https://auth.openai.com/codex/device",
+                "- Enter the code shown below",
                 "",
                 "Then retry your message."
             ].join("\n");
             addMessageToUI('assistant', tip);
 
-            if (sessionStorage.getItem('codex_device_auth_autoran_v1') !== '1') {
-                sessionStorage.setItem('codex_device_auth_autoran_v1', '1');
-                runInTerminal('codex login --device-auth\n', { preferScope: 'main', autoShow: true });
-            }
-
             // Poll for up to ~2 minutes so the next call can proceed without manual retry.
             for (let i = 0; i < 24; i++) {
                 await new Promise((r) => setTimeout(r, 5000));
+                if (loginId) {
+                    try {
+                        const sres = await fetch(`/api/codex/login/device/status?loginId=${encodeURIComponent(loginId)}`);
+                        const s = await sres.json();
+                        if (s?.code) {
+                            addMessageToUI('assistant', `Device code: \`${s.code}\``);
+                        }
+                        if (s?.status === 'success') {
+                            sessionStorage.removeItem('codex_device_login_id_v1');
+                        }
+                    } catch { }
+                }
                 const next = await getCodexLoginStatus();
                 if (next.loggedIn) return true;
             }
@@ -2456,28 +2473,28 @@
             if (raw === '/mcp') {
                 if (input) input.value = '';
                 addMessageToUI('user', '/mcp');
-                const ai = addMessageToUI('assistant', 'Loading MCP servers...');
+                const ai = addMessageToUI('assistant', 'Loading MCP tools...');
                 try {
-                    const res = await fetch('/api/codex/mcp/details');
+                    const res = await fetch('/api/mcp/tools');
                     const data = await res.json();
-                    const servers = Array.isArray(data?.servers) ? data.servers : [];
-                    if (!servers.length) {
-                        renderMarkdownInto(ai, 'No MCP servers configured.');
+                    const tools = Array.isArray(data?.tools) ? data.tools : [];
+                    if (!tools.length) {
+                        renderMarkdownInto(ai, 'No MCP tools available.');
                         return;
                     }
                     const lines = [
-                        `Configured MCP servers (${servers.length}):`,
+                        `Available MCP tools (${tools.length}):`,
                         '',
-                        ...servers.map((s) => `- \`${s?.name || s?.id || 'server'}\` (${s?.status || 'unknown'})`),
+                        ...tools.map((t) => `- \`${t?.name || 'tool'}\` — ${t?.description || ''}`),
                         '',
                         'Details:',
                         '```json',
-                        JSON.stringify(servers, null, 2),
+                        JSON.stringify(tools, null, 2),
                         '```',
                     ].join('\n');
                     renderMarkdownInto(ai, lines);
                 } catch (e) {
-                    ai.textContent = `Failed to load MCP servers: ${e?.message || e}`;
+                    ai.textContent = `Failed to load MCP tools: ${e?.message || e}`;
                 }
                 return;
             }
