@@ -2381,6 +2381,8 @@
             }
         }
 
+        let codexAuthMessageEl = null;
+
         async function ensureCodexAuthenticated() {
             const status = await getCodexLoginStatus();
             if (status.loggedIn) return true;
@@ -2396,7 +2398,8 @@
                 } catch { }
             }
 
-            const aiMsgEl = addMessageToUI('assistant', '...');
+            const aiMsgEl = codexAuthMessageEl || addMessageToUI('assistant', '...');
+            codexAuthMessageEl = aiMsgEl;
             const baseTip = [
                 "Codex needs authentication.",
                 "",
@@ -2427,6 +2430,17 @@
                         }
                         if (s?.status === 'success') {
                             sessionStorage.removeItem('codex_device_login_id_v1');
+                        }
+                        if (!s?.code && Array.isArray(s?.outputTail) && s.outputTail.length) {
+                            const updated = [
+                                ...baseTip,
+                                "",
+                                "Waiting for device code...",
+                                "```text",
+                                s.outputTail.slice(-12).join("\n"),
+                                "```"
+                            ].join("\n");
+                            renderMarkdownInto(aiMsgEl, updated);
                         }
                     } catch { }
                 }

@@ -478,12 +478,11 @@ async def _read_device_login_output(attempt: DeviceLoginAttempt) -> None:
             if attempt.url is None and "https://" in text and "auth.openai.com/codex/device" in text:
                 attempt.url = "https://auth.openai.com/codex/device"
             if attempt.code is None:
-                # device code looks like XXXX-YYYYY
-                stripped = text.strip()
-                if len(stripped) >= 9 and "-" in stripped and stripped.replace("-", "").isalnum():
-                    # avoid grabbing random lines
-                    if stripped.count("-") == 1 and 4 <= len(stripped.split("-")[0]) <= 6:
-                        attempt.code = stripped
+                # Device code looks like 4-6 alnum, dash, 4-6 alnum (often uppercase).
+                import re
+                m = re.search(r"\b([A-Za-z0-9]{4,6}-[A-Za-z0-9]{4,6})\b", text)
+                if m:
+                    attempt.code = m.group(1).upper()
         await attempt.proc.wait()
     finally:
         attempt.done = True
