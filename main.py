@@ -351,8 +351,9 @@ async def codex_login_status():
         text = stdout.decode("utf-8", errors="ignore").strip()
         err = stderr.decode("utf-8", errors="ignore").strip()
         # Current CLI prints: "Logged in using ChatGPT" when authenticated
-        logged_in = "Logged in" in text
-        return {"loggedIn": logged_in, "statusText": text or err, "exitCode": proc.returncode}
+        combined = text or err
+        logged_in = "Logged in" in combined
+        return {"loggedIn": logged_in, "statusText": combined, "exitCode": proc.returncode}
     except Exception as e:
         return {"loggedIn": False, "statusText": str(e), "exitCode": None}
 
