@@ -146,12 +146,22 @@
             font-size: 0.9em;
         }
 
+        .chat-message code {
+            color: #e5e7eb !important;
+        }
+
         .chat-message :not(pre) > code {
             color: #e5e7eb;
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255, 255, 255, 0.12);
             padding: 0.1rem 0.3rem;
             border-radius: 0.35rem;
+        }
+
+        /* Tailwind typography adds backticks via pseudo-elements; disable to avoid confusion. */
+        .chat-message.prose code::before,
+        .chat-message.prose code::after {
+            content: "" !important;
         }
 
         .chat-message pre code .hljs-comment,
@@ -2386,7 +2396,8 @@
                 } catch { }
             }
 
-            const tip = [
+            const aiMsgEl = addMessageToUI('assistant', '...');
+            const baseTip = [
                 "Codex needs authentication.",
                 "",
                 "Complete device login:",
@@ -2394,8 +2405,8 @@
                 "- Enter the code shown below",
                 "",
                 "Then retry your message."
-            ].join("\n");
-            addMessageToUI('assistant', tip);
+            ];
+            renderMarkdownInto(aiMsgEl, baseTip.join("\n"));
 
             // Poll for up to ~2 minutes so the next call can proceed without manual retry.
             for (let i = 0; i < 24; i++) {
@@ -2405,7 +2416,14 @@
                         const sres = await fetch(`/api/codex/login/device/status?loginId=${encodeURIComponent(loginId)}`);
                         const s = await sres.json();
                         if (s?.code) {
-                            addMessageToUI('assistant', `Device code: \`${s.code}\``);
+                            const updated = [
+                                ...baseTip,
+                                "",
+                                `Device code: \`${s.code}\``,
+                                "",
+                                "Tip: tap the code to select, or use your keyboard copy."
+                            ].join("\n");
+                            renderMarkdownInto(aiMsgEl, updated);
                         }
                         if (s?.status === 'success') {
                             sessionStorage.removeItem('codex_device_login_id_v1');
