@@ -207,7 +207,8 @@ async def codex_agent_cli(request: CodexRequest):
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message is required")
 
-    base_args = ["codex", "exec", "--experimental-json", "--sandbox", request.sandboxMode or "read-only"]
+    # Use --json to stream JSONL events on stdout; keep stderr for logs/errors.
+    base_args = ["codex", "exec", "--json", "--color", "never", "--sandbox", request.sandboxMode or "read-only"]
     # Map approval policy into config (CLI flag differs between interactive and exec; config works everywhere).
     if request.approvalPolicy:
         base_args += ["--config", f'approval_policy="{request.approvalPolicy}"']
@@ -217,9 +218,11 @@ async def codex_agent_cli(request: CodexRequest):
     # Run inside app dir; allow even if not a git repo (Spaces copies are git, but keep safe)
     base_args += ["--cd", os.path.dirname(__file__), "--skip-git-repo-check"]
 
-    # Resume existing thread if provided
+    # Provide the prompt as an argument (avoids "Reading prompt from stdin..." paths).
     if request.threadId:
-        base_args += ["resume", request.threadId]
+        base_args += ["resume", request.threadId, request.message]
+    else:
+        base_args += [request.message]
 
     env = os.environ.copy()
     if request.apiKey:
@@ -231,15 +234,14 @@ async def codex_agent_cli(request: CodexRequest):
     try:
         proc = await asyncio.create_subprocess_exec(
             *base_args,
-            stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=env,
         )
-        stdout, stderr = await proc.communicate(request.message.encode("utf-8"))
+        stdout, stderr = await proc.communicate()
 
+        err_text = (stderr.decode("utf-8", errors="ignore") or "").strip()
         if proc.returncode != 0:
-            err_text = (stderr.decode("utf-8", errors="ignore") or "").strip()
             if "401 Unauthorized" in err_text or "status 401" in err_text:
                 raise HTTPException(status_code=401, detail=err_text or "Unauthorized")
             raise HTTPException(status_code=500, detail=err_text or "Codex CLI failed")
@@ -247,6 +249,7 @@ async def codex_agent_cli(request: CodexRequest):
         thread_id = None
         final_text = ""
         usage = None
+        saw_event = False
         for line in stdout.decode("utf-8", errors="ignore").splitlines():
             line = line.strip()
             if not line:
@@ -255,6 +258,7 @@ async def codex_agent_cli(request: CodexRequest):
                 event = json.loads(line)
             except Exception:
                 continue
+            saw_event = True
             if event.get("type") == "thread.started":
                 thread_id = event.get("thread_id") or thread_id
             if event.get("type") == "item.completed":
@@ -268,6 +272,13 @@ async def codex_agent_cli(request: CodexRequest):
                 if "401" in err:
                     raise HTTPException(status_code=401, detail=err)
                 raise HTTPException(status_code=500, detail=err)
+
+        # Codex sometimes prints fatal errors to stderr while exiting 0.
+        if not saw_event and err_text:
+            if "401 Unauthorized" in err_text or "status 401" in err_text:
+                raise HTTPException(status_code=401, detail=err_text)
+            if "Error:" in err_text or "Fatal error" in err_text:
+                raise HTTPException(status_code=500, detail=err_text)
 
         return {"threadId": thread_id or request.threadId, "finalResponse": final_text, "usage": usage}
     except HTTPException:
