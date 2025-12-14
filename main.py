@@ -292,6 +292,98 @@ async def codex_agent_cli(request: CodexRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/codex/cli/stream")
+async def codex_agent_cli_stream(request: CodexRequest):
+    """
+    Streams Codex CLI JSONL events (NDJSON) as the agent runs.
+
+    Each line is a JSON object (event). The stream ends with a final object:
+      {"type":"done","threadId": "...", "finalResponse": "...", "usage": {...}}
+    """
+    if not request.message.strip():
+        raise HTTPException(status_code=400, detail="Message is required")
+
+    base_args = ["codex", "exec", "--json", "--color", "never", "--sandbox", request.sandboxMode or "read-only"]
+    if request.approvalPolicy:
+        base_args += ["--config", f'approval_policy=\"{request.approvalPolicy}\"']
+    if request.model:
+        base_args += ["--model", request.model]
+    base_args += ["--cd", os.path.dirname(__file__), "--skip-git-repo-check"]
+
+    if request.threadId:
+        base_args += ["resume", request.threadId, request.message]
+    else:
+        base_args += [request.message]
+
+    env = os.environ.copy()
+    if request.apiKey:
+        env["OPENAI_API_KEY"] = request.apiKey
+        env["CODEX_API_KEY"] = request.apiKey
+        if request.baseUrl:
+            env["OPENAI_BASE_URL"] = request.baseUrl
+
+    async def gen():
+        proc = await asyncio.create_subprocess_exec(
+            *base_args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+        )
+        assert proc.stdout is not None
+        assert proc.stderr is not None
+
+        thread_id = None
+        final_text = ""
+        usage = None
+
+        async def emit(obj: dict):
+            yield (json.dumps(obj, ensure_ascii=False) + "\n").encode("utf-8")
+
+        # Stream stdout events line-by-line
+        try:
+            while True:
+                line = await proc.stdout.readline()
+                if not line:
+                    break
+                raw = line.decode("utf-8", errors="ignore").strip()
+                if not raw:
+                    continue
+                try:
+                    event = json.loads(raw)
+                except Exception:
+                    # forward raw line so UI can debug
+                    async for b in emit({"type": "log", "message": raw}):
+                        yield b
+                    continue
+
+                if event.get("type") == "thread.started":
+                    thread_id = event.get("thread_id") or thread_id
+                if event.get("type") == "item.completed":
+                    item = event.get("item") or {}
+                    if item.get("type") == "agent_message":
+                        final_text = item.get("text") or final_text
+                if event.get("type") == "turn.completed":
+                    usage = event.get("usage") or usage
+                if event.get("type") == "turn.failed":
+                    err = (event.get("error") or {}).get("message") or "Codex turn failed"
+                    async for b in emit({"type": "error", "message": err}):
+                        yield b
+                    break
+
+                async for b in emit(event):
+                    yield b
+        finally:
+            await proc.wait()
+            err_text = (await proc.stderr.read()).decode("utf-8", errors="ignore").strip()
+            if proc.returncode != 0 and err_text:
+                async for b in emit({"type": "stderr", "message": err_text, "returnCode": proc.returncode}):
+                    yield b
+
+            async for b in emit({"type": "done", "threadId": thread_id or request.threadId, "finalResponse": final_text, "usage": usage, "returnCode": proc.returncode}):
+                yield b
+
+    return StreamingResponse(gen(), media_type="application/x-ndjson")
+
 
 @app.get("/api/codex/mcp")
 async def codex_mcp_list():

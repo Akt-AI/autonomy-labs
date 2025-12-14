@@ -2436,7 +2436,7 @@
             aiMsgEl.innerHTML = '';
 
             try {
-                const res = await fetch('/api/codex/cli', {
+                const res = await fetch('/api/codex/cli/stream', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -2476,10 +2476,61 @@
                     }
                     throw new Error(txt || `HTTP ${res.status}`);
                 }
-                const data = await res.json();
-                if (data?.threadId) setCodexThreadId(data.threadId);
-                const finalText = data?.finalResponse || '';
-                renderMarkdownInto(aiMsgEl, finalText);
+
+                const reader = res.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let finalText = '';
+                let threadId = null;
+                const progress = [];
+
+                const renderProgress = () => {
+                    const content = [
+                        progress.length ? 'Progress:' : '',
+                        progress.length ? '```text\n' + progress.slice(-30).join('\n') + '\n```' : '',
+                        finalText ? '\n\n' + finalText : ''
+                    ].filter(Boolean).join('\n');
+                    renderMarkdownInto(aiMsgEl, content || '...');
+                    scrollToBottom();
+                };
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        let evt;
+                        try { evt = JSON.parse(line); } catch { continue; }
+                        if (evt.type === 'thread.started' && evt.thread_id) {
+                            threadId = evt.thread_id;
+                            setCodexThreadId(threadId);
+                        } else if (evt.type === 'item.completed' && evt.item?.type === 'agent_message') {
+                            finalText = evt.item.text || finalText;
+                        } else if (evt.type === 'error') {
+                            progress.push(`error: ${evt.message || ''}`);
+                        } else if (evt.type === 'item.started') {
+                            progress.push(`started: ${evt.item?.type || 'item'}`);
+                        } else if (evt.type === 'item.updated') {
+                            progress.push(`updated: ${evt.item?.type || 'item'}`);
+                        } else if (evt.type === 'item.completed') {
+                            progress.push(`completed: ${evt.item?.type || 'item'}`);
+                        } else if (evt.type === 'turn.completed') {
+                            progress.push(`turn completed: in=${evt.usage?.input_tokens || 0} out=${evt.usage?.output_tokens || 0}`);
+                        } else if (evt.type === 'stderr') {
+                            progress.push(`stderr: ${evt.message || ''}`);
+                        } else if (evt.type === 'done') {
+                            if (evt.threadId) setCodexThreadId(evt.threadId);
+                            if (evt.finalResponse) finalText = evt.finalResponse;
+                        }
+                        renderProgress();
+                    }
+                }
+
+                // Final render (in case only done event carried finalResponse)
+                renderMarkdownInto(aiMsgEl, finalText || (progress.length ? progress.slice(-30).join('\n') : ''));
             } catch (e) {
                 aiMsgEl.textContent = `Error: ${e?.message || e}`;
             }
