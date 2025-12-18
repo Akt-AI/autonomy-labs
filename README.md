@@ -60,6 +60,13 @@ docker build -t autonomy-labs .
 docker run --rm -p 7860:7860 --env-file .env autonomy-labs
 ```
 
+## Codex Auto Fix (GitHub Actions)
+
+This repo includes a manual workflow at `.github/workflows/codex-autofix.yml`.
+
+- Add `OPENAI_API_KEY` as a GitHub Actions secret.
+- Run the workflow from the Actions tab and optionally customize the `prompt` input.
+
 ## Notes
 
 - **Secrets**: don’t hardcode API keys in source. GitHub push protection will block pushes containing tokens.

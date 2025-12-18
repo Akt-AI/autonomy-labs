@@ -1,0 +1,67 @@
+name: Codex Auto Fix
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: "Instructions for Codex (the workflow prefixes '@codex ')"
+        required: false
+        default: "Run the repo's linters/tests (if any) and apply safe autofixes. If a change is needed, edit files directly."
+      branch:
+        description: "Branch to run on (defaults to the ref that triggered the workflow)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: codex-autofix-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || github.ref }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install Codex CLI
+        run: npm i -g @openai/codex
+
+      - name: Run Codex
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          codex exec \
+            --color never \
+            --sandbox workspace-write \
+            --skip-git-repo-check \
+            --config 'approval_policy="never"' \
+            --config 'shell_environment_policy.inherit="all"' \
+            --cd "$GITHUB_WORKSPACE" \
+            "@codex ${{ inputs.prompt }}"
+
+      - name: Commit and push (if changed)
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Codex autofix"
+          git push
