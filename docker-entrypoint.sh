@@ -29,6 +29,47 @@ persist_codex_dir_if_possible() {
   echo "[codex] Using persistent config dir: ${codex_home} -> ${persistent_codex}"
 }
 
+persist_ssh_dir_if_possible() {
+  local persistent_root="/data"
+  local ssh_home="${HOME}/.ssh"
+  local persistent_ssh="${persistent_root}/.ssh"
+
+  if [[ ! -d "${persistent_root}" ]] || [[ ! -w "${persistent_root}" ]]; then
+    return 0
+  fi
+
+  mkdir -p "${persistent_ssh}"
+  chmod 700 "${persistent_ssh}" || true
+
+  if [[ -L "${ssh_home}" ]]; then
+    return 0
+  fi
+
+  if [[ -d "${ssh_home}" ]] && [[ -n "$(ls -A "${ssh_home}" 2>/dev/null || true)" ]]; then
+    mkdir -p "${persistent_ssh}"
+    cp -a "${ssh_home}/." "${persistent_ssh}/" 2>/dev/null || true
+    rm -rf "${ssh_home}"
+  else
+    rm -rf "${ssh_home}" 2>/dev/null || true
+  fi
+
+  ln -s "${persistent_ssh}" "${ssh_home}"
+  echo "[ssh] Using persistent config dir: ${ssh_home} -> ${persistent_ssh}"
+}
+
+ensure_codex_workspace_dir() {
+  local persistent_root="/data"
+  local workspace_dir="${persistent_root}/codex/workspace"
+  if [[ ! -d "${persistent_root}" ]] || [[ ! -w "${persistent_root}" ]]; then
+    return 0
+  fi
+  mkdir -p "${workspace_dir}"
+  chmod 700 "${persistent_root}/codex" 2>/dev/null || true
+  chmod 700 "${workspace_dir}" 2>/dev/null || true
+  chown -R "$(id -u)":"$(id -g)" "${persistent_root}/codex" 2>/dev/null || true
+  echo "[codex] Default workspace: ${workspace_dir}"
+}
+
 ensure_codex_home_permissions() {
   local codex_home="${HOME}/.codex"
   mkdir -p "${codex_home}/sessions" "${codex_home}/logs" 2>/dev/null || true
@@ -66,9 +107,12 @@ EOF
   fi
 }
 
+persist_codex_dir_if_possible
+ensure_codex_home_permissions
+persist_ssh_dir_if_possible
+ensure_codex_workspace_dir
+
 if command -v ssh-keygen >/dev/null 2>&1; then
-  persist_codex_dir_if_possible
-  ensure_codex_home_permissions
   ensure_ssh_keypair
 else
   echo "[git ssh] ssh-keygen not found; install openssh-client to enable SSH key generation." >&2

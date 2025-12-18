@@ -131,11 +131,18 @@ class CodexRequest(BaseModel):
     message: str
     threadId: Optional[str] = None
     model: Optional[str] = None
-    sandboxMode: Optional[str] = "read-only"
+    sandboxMode: Optional[str] = "workspace-write"
     approvalPolicy: Optional[str] = "never"
     apiKey: Optional[str] = None
     baseUrl: Optional[str] = None
     modelReasoningEffort: Optional[str] = "minimal"
+
+
+def _default_codex_workdir() -> str:
+    preferred = "/data/codex/workspace"
+    if os.path.isdir(preferred):
+        return preferred
+    return os.path.dirname(__file__)
 
 @app.post("/api/codex")
 async def codex_agent(request: CodexRequest):
@@ -158,7 +165,7 @@ async def codex_agent(request: CodexRequest):
         "sandboxMode": request.sandboxMode,
         "approvalPolicy": request.approvalPolicy,
         "modelReasoningEffort": request.modelReasoningEffort,
-        "workingDirectory": os.path.dirname(__file__),
+        "workingDirectory": _default_codex_workdir(),
     }
 
     try:
@@ -216,7 +223,7 @@ async def codex_agent_cli(request: CodexRequest):
     message = _with_codex_agent_prefix(request.message)
 
     # Use --json to stream JSONL events on stdout; keep stderr for logs/errors.
-    base_args = ["codex", "exec", "--json", "--color", "never", "--sandbox", request.sandboxMode or "read-only"]
+    base_args = ["codex", "exec", "--json", "--color", "never", "--sandbox", request.sandboxMode or "workspace-write"]
     # Map approval policy into config (CLI flag differs between interactive and exec; config works everywhere).
     if request.approvalPolicy:
         base_args += ["--config", f'approval_policy="{request.approvalPolicy}"']
@@ -224,7 +231,7 @@ async def codex_agent_cli(request: CodexRequest):
     if request.model:
         base_args += ["--model", request.model]
     # Run inside app dir; allow even if not a git repo (Spaces copies are git, but keep safe)
-    base_args += ["--cd", os.path.dirname(__file__), "--skip-git-repo-check"]
+    base_args += ["--cd", _default_codex_workdir(), "--skip-git-repo-check"]
 
     # Provide the prompt as an argument (avoids "Reading prompt from stdin..." paths).
     if request.threadId:
@@ -319,12 +326,12 @@ async def codex_agent_cli_stream(request: CodexRequest):
 
     message = _with_codex_agent_prefix(request.message)
 
-    base_args = ["codex", "exec", "--json", "--color", "never", "--sandbox", request.sandboxMode or "read-only"]
+    base_args = ["codex", "exec", "--json", "--color", "never", "--sandbox", request.sandboxMode or "workspace-write"]
     if request.approvalPolicy:
         base_args += ["--config", f'approval_policy=\"{request.approvalPolicy}\"']
     if request.model:
         base_args += ["--model", request.model]
-    base_args += ["--cd", os.path.dirname(__file__), "--skip-git-repo-check"]
+    base_args += ["--cd", _default_codex_workdir(), "--skip-git-repo-check"]
 
     if request.threadId:
         base_args += ["resume", request.threadId, message]

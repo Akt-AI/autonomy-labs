@@ -706,6 +706,16 @@
                                     onchange="saveCodexSdkSettings()">
                                 <div class="text-xs text-gray-500 mt-1">Prevents chat-provider models (e.g. DeepSeek) from being sent to Codex.</div>
                             </div>
+                            <div class="mt-3">
+                                <label class="flex items-center justify-between gap-3 bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2">
+                                    <div>
+                                        <div class="text-sm text-gray-100">Show Codex JSONL stream</div>
+                                        <div class="text-xs text-gray-400 mt-0.5">Appends raw JSON events to the progress view while Codex runs.</div>
+                                    </div>
+                                    <input id="codex-show-jsonl" type="checkbox" onchange="setCodexShowJsonl(this.checked)"
+                                        class="h-4 w-4 accent-blue-600">
+                                </label>
+                            </div>
                             <div id="codex-mcp-list" class="mt-3 text-xs text-gray-400"></div>
                         </div>
 
@@ -1281,6 +1291,16 @@
             };
         }
 
+        function getCodexShowJsonl() {
+            return localStorage.getItem('codex_show_jsonl_v1') === '1';
+        }
+
+        function setCodexShowJsonl(enabled) {
+            localStorage.setItem('codex_show_jsonl_v1', enabled ? '1' : '0');
+            const el = document.getElementById('codex-show-jsonl');
+            if (el) el.checked = !!enabled;
+        }
+
         function saveCodexSdkSettings() {
             const baseUrl = document.getElementById('codex-base-url')?.value || '';
             const apiKey = document.getElementById('codex-api-key')?.value || '';
@@ -1349,6 +1369,9 @@
                 if (localStorage.getItem('codex_sdk_model_v1') == null) {
                     localStorage.setItem('codex_sdk_model_v1', '');
                 }
+                if (localStorage.getItem('codex_show_jsonl_v1') == null) {
+                    localStorage.setItem('codex_show_jsonl_v1', '0');
+                }
 
                 // Logged-in user badge (email + username)
                 try {
@@ -1395,6 +1418,7 @@
                 if (codexBase) codexBase.value = codexSettings.baseUrl;
                 if (codexKey) codexKey.value = codexSettings.apiKey;
                 if (codexModel) codexModel.value = codexSettings.model;
+                setCodexShowJsonl(getCodexShowJsonl());
                 setAgentUseCodexCli(getAgentUseCodexCli());
 
                 // Multi-modal attachments
@@ -2428,6 +2452,7 @@
             // Only pass baseUrl when using API key auth; device-auth should rely on Codex defaults.
             const baseUrl = apiKey ? (codex.baseUrl || '') : '';
             const model = (codex.model || '').trim();
+            const showJsonl = getCodexShowJsonl();
 
             addMessageToUI('user', message || '');
             scrollToBottom();
@@ -2436,14 +2461,14 @@
             aiMsgEl.innerHTML = '';
 
             try {
-                const res = await fetch('/api/codex/cli/stream', {
+                        const res = await fetch('/api/codex/cli/stream', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         message,
                         threadId: getCodexThreadId() || null,
                         model: model || null,
-                        sandboxMode: 'read-only',
+                        sandboxMode: 'workspace-write',
                         approvalPolicy: 'never',
                         modelReasoningEffort: 'minimal',
                         apiKey: apiKey || null,
@@ -2504,6 +2529,9 @@
                         if (!line.trim()) continue;
                         let evt;
                         try { evt = JSON.parse(line); } catch { continue; }
+                        if (showJsonl) {
+                            progress.push(JSON.stringify(evt));
+                        }
                         if (evt.type === 'thread.started' && evt.thread_id) {
                             threadId = evt.thread_id;
                             setCodexThreadId(threadId);
