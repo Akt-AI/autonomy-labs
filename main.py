@@ -200,12 +200,20 @@ async def codex_agent(request: CodexRequest):
 @app.post("/api/codex/cli")
 async def codex_agent_cli(request: CodexRequest):
     """
-    Runs Codex directly via the CLI (`codex exec --experimental-json`) and extracts the final agent message.
+    Runs Codex directly via the CLI (`codex exec --json`) and extracts the final agent message.
 
     This avoids SDK/CLI mismatches and uses the same device-auth session as `codex login --device-auth`.
     """
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message is required")
+
+    def _with_codex_agent_prefix(message: str) -> str:
+        msg = message.strip()
+        if msg.startswith("@"):
+            return message
+        return f"@codex {message}"
+
+    message = _with_codex_agent_prefix(request.message)
 
     # Use --json to stream JSONL events on stdout; keep stderr for logs/errors.
     base_args = ["codex", "exec", "--json", "--color", "never", "--sandbox", request.sandboxMode or "read-only"]
@@ -220,9 +228,9 @@ async def codex_agent_cli(request: CodexRequest):
 
     # Provide the prompt as an argument (avoids "Reading prompt from stdin..." paths).
     if request.threadId:
-        base_args += ["resume", request.threadId, request.message]
+        base_args += ["resume", request.threadId, message]
     else:
-        base_args += [request.message]
+        base_args += [message]
 
     env = os.environ.copy()
     if request.apiKey:
@@ -303,6 +311,14 @@ async def codex_agent_cli_stream(request: CodexRequest):
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message is required")
 
+    def _with_codex_agent_prefix(message: str) -> str:
+        msg = message.strip()
+        if msg.startswith("@"):
+            return message
+        return f"@codex {message}"
+
+    message = _with_codex_agent_prefix(request.message)
+
     base_args = ["codex", "exec", "--json", "--color", "never", "--sandbox", request.sandboxMode or "read-only"]
     if request.approvalPolicy:
         base_args += ["--config", f'approval_policy=\"{request.approvalPolicy}\"']
@@ -311,9 +327,9 @@ async def codex_agent_cli_stream(request: CodexRequest):
     base_args += ["--cd", os.path.dirname(__file__), "--skip-git-repo-check"]
 
     if request.threadId:
-        base_args += ["resume", request.threadId, request.message]
+        base_args += ["resume", request.threadId, message]
     else:
-        base_args += [request.message]
+        base_args += [message]
 
     env = os.environ.copy()
     if request.apiKey:
