@@ -260,6 +260,44 @@
     background: rgba(15, 23, 42, 0.35);
 }
 
+/* Route-focused pages */
+[data-page="settings"] #dashboard-view,
+[data-page="settings"] #terminal-view,
+[data-page="settings"] #notes-view,
+[data-page="settings"] #rooms-view,
+[data-page="admin"] #dashboard-view,
+[data-page="admin"] #terminal-view,
+[data-page="admin"] #notes-view,
+[data-page="admin"] #rooms-view {
+    display: none !important;
+}
+
+[data-page="settings"] #chat-sidebar,
+[data-page="admin"] #chat-sidebar {
+    display: none !important;
+}
+
+[data-page="settings"] #agent-split-root,
+[data-page="admin"] #agent-split-root {
+    display: none !important;
+}
+
+[data-page="settings"] #settings-overlay,
+[data-page="admin"] #settings-overlay {
+    display: none !important;
+}
+
+[data-page="settings"] #settings-drawer,
+[data-page="admin"] #settings-drawer {
+    position: static !important;
+    transform: none !important;
+    width: min(980px, calc(100% - 24px)) !important;
+    height: auto !important;
+    max-height: none !important;
+    margin: 18px auto !important;
+    border-radius: 16px !important;
+}
+
 .agent-toolbar {
     display: flex;
     align-items: center;

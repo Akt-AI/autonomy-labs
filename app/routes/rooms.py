@@ -331,6 +331,21 @@ async def websocket_rooms(websocket: WebSocket):
                         await target.send_text(_ws_json(forward))
                     except Exception:
                         pass
+            elif mtype == "device.hello":
+                # Device metadata for UX (best-effort; not persisted).
+                name = str(msg.get("name") or "").strip()
+                if len(name) > 80:
+                    name = name[:80]
+                await _broadcast(
+                    websocket.app,
+                    room_id,
+                    {
+                        "type": "device.hello",
+                        "roomId": room_id,
+                        "deviceId": device_id,
+                        "name": name or None,
+                    },
+                )
             else:
                 await websocket.send_text(_ws_json({"type": "error", "message": "unknown_type"}))
     finally:

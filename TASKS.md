@@ -24,7 +24,7 @@ Legend:
 - [x] Add `/docs` page and route `Get started` there.
 - [x] Split `static/dashboard.html` into JS/CSS files (`static/dashboard.js`, `static/dashboard.css`).
 - [x] Theme tokens shared across login + dashboard (single source of truth via `static/theme.css`).
-- [~] Separate Settings vs Admin dashboard (deep links + admin feature overrides done; full dedicated pages pending).
+- [x] Separate Settings vs Admin pages (route-focused `/settings` and `/admin` views).
 
 ## P2 — Provider auth parity (Codex/Gemini/Claude)
 - [x] Codex auth file generation from env/secrets (`~/.codex/.auth.json` and `~/.codex/auth.json`).
@@ -58,9 +58,9 @@ Legend:
 - [x] Jobs UI (MVP: start/cancel/list crawl jobs).
 
 ## P3 — P2P pubsub chat + account manager
-- [~] Account manager: identities/devices, memberships, permissions, moderation.
-- [~] Transport: WebRTC DataChannel + signaling, with server pubsub fallback.
-- [~] UX: rooms, presence, delivery status, network mode indicators.
+- [~] Account manager: identities/devices, memberships, permissions, moderation (MVP: display name + device identity).
+- [x] Transport: WebRTC DataChannel + signaling, with server pubsub fallback.
+- [~] UX: rooms, presence, delivery status, network mode indicators (MVP: peer list + device names + P2P ack).
 
 ## Engineering hygiene
 - [x] Add `.env.example`.

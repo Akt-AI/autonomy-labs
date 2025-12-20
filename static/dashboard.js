@@ -189,29 +189,51 @@ let supabase;
             drawer.classList.remove('settings-hidden');
             const signupToggle = document.getElementById('auth-allow-signup');
             if (signupToggle) signupToggle.checked = getAllowSignup();
+            applyPageModeFromRoute();
         }
 
         function openAdmin() {
             if (currentPath() !== '/admin') setAppRoute('/admin');
             openSettings();
-            const admin = document.getElementById('admin-panel');
-            if (admin) admin.scrollIntoView({ block: 'nearest' });
-            // Best-effort auto-load templates for admins.
-            setTimeout(() => {
-                loadAdminFeatureOverrides();
-                loadAdminMcpTemplates();
-                loadAdminUsers();
-            }, 0);
+            applyPageModeFromRoute();
         }
 
         function closeSettings() {
             const overlay = document.getElementById('settings-overlay');
             const drawer = document.getElementById('settings-drawer');
             if (!overlay || !drawer) return;
+            if (currentPath() === '/settings' || currentPath() === '/admin') {
+                window.location.href = routeUrl('app');
+                return;
+            }
             overlay.classList.add('settings-hidden');
             drawer.classList.add('settings-hidden');
             const p = currentPath();
             if (p === '/settings' || p === '/admin') setAppRoute('/app');
+        }
+
+        function applyPageModeFromRoute() {
+            const p = currentPath();
+            const mode = p === '/settings' ? 'settings' : (p === '/admin' ? 'admin' : '');
+            if (mode) document.documentElement.setAttribute('data-page', mode);
+            else document.documentElement.removeAttribute('data-page');
+
+            // Ensure chat view is visible so the settings drawer exists in the DOM.
+            if (mode) {
+                switchMode('chat');
+                openSettings();
+                if (mode === 'admin') {
+                    const admin = document.getElementById('admin-panel');
+                    if (admin) admin.classList.remove('hidden');
+                    setTimeout(() => {
+                        const panel = document.getElementById('admin-panel');
+                        if (panel) panel.scrollIntoView({ block: 'nearest' });
+                        loadAdminFeatureOverrides();
+                        loadAdminMcpTemplates();
+                        loadAdminUsers();
+                    }, 0);
+                }
+            }
         }
 
         function toggleSettings() {
@@ -268,6 +290,76 @@ let supabase;
             localStorage.setItem('auth_allow_signup_v1', allowed ? '1' : '0');
             const el = document.getElementById('auth-allow-signup');
             if (el) el.checked = !!allowed;
+        }
+
+        function setAccountStatus(msg) {
+            const el = document.getElementById('account-status');
+            if (el) el.textContent = msg || '';
+        }
+
+        function getDeviceName() {
+            return (localStorage.getItem('device_name_v1') || '').trim();
+        }
+
+        function setDeviceName(name) {
+            const n = String(name || '').trim().slice(0, 80);
+            localStorage.setItem('device_name_v1', n);
+            const el = document.getElementById('account-device-name');
+            if (el) el.value = n;
+        }
+
+        function getDeviceLabel(deviceId) {
+            const id = String(deviceId || '').trim();
+            if (!id) return '';
+            const mine = id === getDeviceId();
+            const nm = mine ? getDeviceName() : (roomsPeerMeta.get(id)?.name || '');
+            const short = id.length > 10 ? `${id.slice(0, 6)}…${id.slice(-4)}` : id;
+            if (nm) return `${nm} (${short})`;
+            return short;
+        }
+
+        async function saveAccountSettings() {
+            const name = (document.getElementById('account-display-name')?.value || '').trim();
+            const deviceName = (document.getElementById('account-device-name')?.value || '').trim();
+            try {
+                setAccountStatus('Saving…');
+                setDeviceName(deviceName);
+                if (name) {
+                    const { error } = await supabase.auth.updateUser({ data: { name } });
+                    if (error) throw error;
+                }
+                setAccountStatus('Saved.');
+                try {
+                    const { data: userData } = await supabase.auth.getUser();
+                    const user = userData?.user;
+                    if (user) {
+                        const badge = document.getElementById('user-badge');
+                        const nameEl = document.getElementById('user-name');
+                        const emailEl = document.getElementById('user-email');
+                        if (badge) badge.classList.remove('hidden');
+                        if (nameEl) nameEl.textContent = user.user_metadata?.name || user.email?.split('@')?.[0] || 'User';
+                        if (emailEl) emailEl.textContent = user.email || '';
+                    }
+                } catch { }
+                // Re-announce device info in current room (if connected).
+                sendRoomsHello();
+                renderRoomsPeersList();
+            } catch (e) {
+                setAccountStatus(`Save failed: ${e?.message || e}`);
+            }
+        }
+
+        function regenerateDeviceId() {
+            if (!confirm('Create a new device identity in this browser? (Rooms will see it as a new peer)')) return;
+            const key = 'device_id_v1';
+            const id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())) + '-' + Math.random().toString(16).slice(2);
+            localStorage.setItem(key, id);
+            const el = document.getElementById('account-device-id');
+            if (el) el.textContent = id;
+            // Reconnect rooms WS so peers update.
+            try {
+                if (roomsWs && roomsWs.readyState === WebSocket.OPEN) roomsWs.close();
+            } catch { }
         }
 
         function getCodexSdkSettings() {
@@ -1119,6 +1211,14 @@ let supabase;
                         if (badge) badge.classList.remove('hidden');
                         if (nameEl) nameEl.textContent = username;
                         if (emailEl) emailEl.textContent = email;
+
+                        // Account panel (Settings)
+                        const dn = document.getElementById('account-display-name');
+                        if (dn) dn.value = user.user_metadata?.name || '';
+                        const did = document.getElementById('account-device-id');
+                        if (did) did.textContent = getDeviceId();
+                        const dname = document.getElementById('account-device-name');
+                        if (dname && !dname.value) dname.value = getDeviceName();
                     }
                 } catch (e) {
                     console.warn('User badge load failed', e);
@@ -1287,21 +1387,19 @@ let supabase;
                 applyTerminalLayout();
 
                 // Route helpers
-                if (location.pathname === '/settings') openSettings();
-                if (location.pathname === '/admin') openAdmin();
+                applyPageModeFromRoute();
                 window.addEventListener('popstate', () => {
-                    if (location.pathname === '/settings') openSettings();
-                    else if (location.pathname === '/admin') openAdmin();
-                    else closeSettings();
+                    applyPageModeFromRoute();
+                    if (location.pathname !== '/settings' && location.pathname !== '/admin') closeSettings();
                 });
                 try {
                     if (sessionStorage.getItem('open_settings_on_load_v1') === '1') {
                         sessionStorage.removeItem('open_settings_on_load_v1');
-                        openSettings();
+                        window.location.href = routeUrl('settings');
                     }
                     if (sessionStorage.getItem('open_admin_on_load_v1') === '1') {
                         sessionStorage.removeItem('open_admin_on_load_v1');
-                        openAdmin();
+                        window.location.href = routeUrl('admin');
                     }
                 } catch { }
 
@@ -3394,6 +3492,7 @@ let supabase;
         let roomsPeers = [];
         let roomsP2P = new Map(); // deviceId -> { pc, dc, polite, makingOffer, ignoreOffer }
         let roomsMessageEls = new Map(); // messageId -> { el, statusEl }
+        let roomsPeerMeta = new Map(); // deviceId -> { name }
         let roomsReconnectAttempts = 0;
         let roomsReconnectTimer = null;
         let roomsWsClosing = false;
@@ -3430,6 +3529,47 @@ let supabase;
             if (el) el.textContent = `Peers: ${roomsPeers.length}`;
         }
 
+        function toggleRoomsPeers(forceOpen = null) {
+            const panel = document.getElementById('rooms-peers-panel');
+            if (!panel) return;
+            const open = forceOpen == null ? panel.classList.contains('hidden') : !!forceOpen;
+            panel.classList.toggle('hidden', !open);
+            if (open) renderRoomsPeersList();
+        }
+
+        function renderRoomsPeersList() {
+            const list = document.getElementById('rooms-peers-list');
+            if (!list) return;
+            list.innerHTML = '';
+            const self = getDeviceId();
+            const peers = [self, ...(roomsPeers || []).filter((p) => p && p !== self)];
+            for (const id of peers) {
+                const isSelf = id === self;
+                const name = isSelf ? getDeviceName() : (roomsPeerMeta.get(id)?.name || '');
+                const conn = isSelf
+                    ? 'you'
+                    : (roomsP2P.get(id)?.dc?.readyState === 'open' ? 'p2p' : 'ws');
+                const card = document.createElement('div');
+                card.className = 'bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2';
+                const top = document.createElement('div');
+                top.className = 'flex items-center justify-between gap-2';
+                const title = document.createElement('div');
+                title.className = 'text-gray-100 font-semibold truncate';
+                title.textContent = name ? `${name}` : getDeviceLabel(id);
+                const right = document.createElement('div');
+                right.className = 'text-xs text-gray-400';
+                right.textContent = conn;
+                top.appendChild(title);
+                top.appendChild(right);
+                const sub = document.createElement('div');
+                sub.className = 'text-xs text-gray-500 mt-0.5 font-mono truncate';
+                sub.textContent = id;
+                card.appendChild(top);
+                card.appendChild(sub);
+                list.appendChild(card);
+            }
+        }
+
         function setRoomsStatus(text) {
             const el = document.getElementById('rooms-status');
             if (el) el.textContent = text || '';
@@ -3451,6 +3591,15 @@ let supabase;
             if (!panel) return;
             const open = forceOpen == null ? panel.classList.contains('hidden') : !!forceOpen;
             panel.classList.toggle('hidden', !open);
+        }
+
+        function sendRoomsHello() {
+            if (!roomsWs || roomsWs.readyState !== WebSocket.OPEN) return;
+            sendRoomsWs({
+                type: 'device.hello',
+                deviceId: getDeviceId(),
+                name: getDeviceName() || null,
+            });
         }
 
         function renderRoomMembers(data) {
@@ -3826,6 +3975,7 @@ let supabase;
             roomsWs.onopen = () => {
                 roomsReconnectAttempts = 0;
                 setRoomsConnStatus('WS connected');
+                sendRoomsHello();
                 maybeStartRoomP2p();
             };
             roomsWs.onclose = () => {
@@ -3840,6 +3990,7 @@ let supabase;
                 if (t === 'presence.snapshot') {
                     roomsPeers = Array.isArray(msg?.peers) ? msg.peers : [];
                     setRoomsPeersCount();
+                    sendRoomsHello();
                     maybeStartRoomP2p();
                     return;
                 }
@@ -3847,6 +3998,7 @@ let supabase;
                     const id = String(msg?.deviceId || '').trim();
                     if (id && !roomsPeers.includes(id)) roomsPeers.push(id);
                     setRoomsPeersCount();
+                    sendRoomsHello();
                     maybeStartRoomP2p();
                     return;
                 }
@@ -3856,6 +4008,16 @@ let supabase;
                     const entry = roomsP2P.get(id);
                     if (entry) closeRoomP2pPeer(id, entry);
                     setRoomsPeersCount();
+                    renderRoomsPeersList();
+                    return;
+                }
+                if (t === 'device.hello') {
+                    const id = String(msg?.deviceId || '').trim();
+                    const name = String(msg?.name || '').trim();
+                    if (id) {
+                        roomsPeerMeta.set(id, { name });
+                        renderRoomsPeersList();
+                    }
                     return;
                 }
                 if (t === 'chat.message') {
@@ -3909,7 +4071,7 @@ let supabase;
                 } catch { }
             }
             if (any) {
-                appendRoomMessage({ id: clientId, text, ts: new Date().toISOString(), fromDeviceId: getDeviceId() }, { status: 'p2p' });
+                appendRoomMessage({ id: clientId, text, ts: new Date().toISOString(), fromDeviceId: getDeviceId() }, { status: 'p2p (sent)' });
             }
             return any;
         }
@@ -3987,12 +4149,30 @@ let supabase;
         function wireRoomDataChannel(peerId, dc) {
             dc.onopen = () => {
                 setRoomsConnStatus('WS + P2P');
+                try {
+                    dc.send(JSON.stringify({ type: 'device.hello', deviceId: getDeviceId(), name: getDeviceName() || null }));
+                } catch { }
+                renderRoomsPeersList();
             };
             dc.onmessage = (e) => {
                 let msg;
                 try { msg = JSON.parse(e.data); } catch { return; }
                 if (msg?.type === 'chat.message') {
                     appendRoomMessage({ id: msg.id, text: msg.text, ts: msg.ts, fromDeviceId: peerId });
+                    try { dc.send(JSON.stringify({ type: 'chat.ack', id: msg.id })); } catch { }
+                    return;
+                }
+                if (msg?.type === 'chat.ack') {
+                    const msgId = String(msg?.id || '').trim();
+                    const entry = msgId ? roomsMessageEls.get(msgId) : null;
+                    if (entry?.statusEl) entry.statusEl.textContent = 'delivered';
+                    return;
+                }
+                if (msg?.type === 'device.hello') {
+                    const id = String(msg?.deviceId || peerId).trim();
+                    const name = String(msg?.name || '').trim();
+                    if (id) roomsPeerMeta.set(id, { name });
+                    renderRoomsPeersList();
                 }
             };
             dc.onclose = () => {
