@@ -73,6 +73,6 @@ This repo includes a manual workflow at `.github/workflows/codex-autofix.yml`.
 - **Terminal PTY**: the host/container must have PTY devices (`/dev/pts`) available for interactive terminals.
 - **Codex login (Hugging Face Spaces/web terminal)**: Spaces expose a single port, so localhost callback URLs (like `http://localhost:1455/auth/callback?...`) won’t work; use device auth: `codex login --device-auth` (alias: `codex-login`).
 - **Codex login persistence (Spaces)**: on startup the container will use `/data/.codex` (if available) for `~/.codex`, so device-auth stays logged in across restarts.
-- **Codex tokens (Spaces Secrets)**: if you already have tokens, set `CODEX_ID_TOKEN`, `CODEX_ACCESS_TOKEN`, `CODEX_REFRESH_TOKEN` (and optionally `CODEX_ACCOUNT_ID`) as Spaces Secrets; the container will write `~/.codex/auth.json` on startup.
+- **Codex tokens (Spaces Secrets)**: if you already have tokens, set `CODEX_ID_TOKEN`, `CODEX_ACCESS_TOKEN`, `CODEX_REFRESH_TOKEN` (and optionally `CODEX_ACCOUNT_ID`) as Spaces Secrets; the container will write `~/.codex/.auth.json` (and `~/.codex/auth.json`) on startup.
 - **Gemini CLI**: installed as `gemini` via `npm i -g @google/gemini-cli`. Set one of `GEMINI_API_KEY`, `GOOGLE_GENAI_USE_VERTEXAI`, or `GOOGLE_GENAI_USE_GCA` (Spaces Secret recommended).
 - **Git over SSH (web terminal/Docker)**: the container auto-generates `~/.ssh/id_ed25519` on first start and prints the public key; add it to your Git provider, then use `git@github.com:ORG/REPO.git` URLs.

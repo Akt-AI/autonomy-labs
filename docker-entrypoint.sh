@@ -81,6 +81,7 @@ ensure_codex_home_permissions() {
 ensure_codex_auth_from_env() {
   local codex_home="${HOME}/.codex"
   local auth_path="${codex_home}/auth.json"
+  local dot_auth_path="${codex_home}/.auth.json"
 
   # Tokens should be provided as HF Spaces secrets / env vars at runtime.
   # - CODEX_ID_TOKEN
@@ -93,7 +94,8 @@ ensure_codex_auth_from_env() {
   fi
 
   mkdir -p "${codex_home}"
-  cat >"${auth_path}" <<EOF
+  local auth_json
+  auth_json="$(cat <<EOF
 {
   "OPENAI_API_KEY": null,
   "tokens": {
@@ -105,9 +107,14 @@ ensure_codex_auth_from_env() {
   "last_refresh": null
 }
 EOF
-  chmod 600 "${auth_path}" 2>/dev/null || true
-  chown "$(id -u)":"$(id -g)" "${auth_path}" 2>/dev/null || true
-  echo "[codex] Wrote auth config from env to: ${auth_path}"
+)"
+
+  printf '%s\n' "${auth_json}" >"${auth_path}"
+  printf '%s\n' "${auth_json}" >"${dot_auth_path}"
+
+  chmod 600 "${auth_path}" "${dot_auth_path}" 2>/dev/null || true
+  chown "$(id -u)":"$(id -g)" "${auth_path}" "${dot_auth_path}" 2>/dev/null || true
+  echo "[codex] Wrote auth config from env to: ${auth_path} and ${dot_auth_path}"
 }
 
 ensure_ssh_keypair() {
