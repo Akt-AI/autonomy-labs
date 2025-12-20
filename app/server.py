@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import shutil
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -29,6 +30,20 @@ from app.routes.user import router as user_router
 from app.routes.vault import router as vault_router
 
 _ROOT = Path(__file__).resolve().parent.parent
+
+
+def _ensure_supabase_asset() -> None:
+    target = _ROOT / "static" / "vendor" / "supabase-js.min.js"
+    if target.exists():
+        return
+    source = _ROOT / "node_modules" / "@supabase" / "supabase-js" / "dist" / "umd" / "supabase.min.js"
+    if not source.exists():
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.copyfile(source, target)
+    except Exception:
+        pass
 
 
 @asynccontextmanager
@@ -83,6 +98,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    _ensure_supabase_asset()
     app = FastAPI(lifespan=lifespan)
 
     @app.exception_handler(StarletteHTTPException)

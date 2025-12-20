@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@openai/codex-sdk": "0.73.0-alpha.1"
+    "@openai/codex-sdk": "0.73.0-alpha.1",
+    "@supabase/supabase-js": "2.56.0"
   }
 }
