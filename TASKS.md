@@ -48,7 +48,7 @@ Legend:
 
 ## P3 — RAG + indexing (docs/web/GitHub) + “password manager”
 - [ ] Clarify “password manager” scope and threat model.
-- [ ] Document upload indexing connector.
+- [x] Document upload indexing connector (MVP: text-only, keyword search).
 - [ ] Website crawler indexing (depth/allowlist/robots/rate limits).
 - [ ] GitHub repo indexing connector (branch/path filters + token support).
 - [ ] Jobs UI (progress/retries/errors/access controls).

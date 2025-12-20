@@ -14,6 +14,7 @@ from app.routes.base import router as base_router
 from app.routes.chat import router as chat_router
 from app.routes.codex import router as codex_router
 from app.routes.mcp import router as mcp_router
+from app.routes.rag import router as rag_router
 from app.routes.terminal import router as terminal_router
 from app.routes.user import router as user_router
 
@@ -77,5 +78,6 @@ def create_app() -> FastAPI:
     app.include_router(terminal_router)
     app.include_router(user_router)
     app.include_router(admin_router)
+    app.include_router(rag_router)
 
     return app

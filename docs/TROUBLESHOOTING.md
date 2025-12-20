@@ -16,6 +16,13 @@ If you use env-based token auth, set one of:
 - `CODEX_REFRESH_TOKEN` or `REFRESH_TOKEN`
 - optional `CODEX_ACCOUNT_ID` or `ACCOUNT_ID`
 
+Notes:
+- You do not need to provide `last_refresh` as a Secret; it is written automatically.
+
+## RAG endpoints return 403 (“Indexing is disabled”)
+
+Set `ENABLE_INDEXING=1` in your environment and restart the container.
+
 ## Terminal shows vertical/1-column text
 
 This usually means the terminal “fit” ran while the terminal view was hidden or at size 0.
@@ -29,4 +36,3 @@ Mitigations:
 If the backend prints `PTY allocation failed`, the runtime likely lacks `/dev/pts` or has exhausted PTYs.
 
 HF Spaces generally supports PTYs, but custom runtimes may not.
-

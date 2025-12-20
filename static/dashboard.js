@@ -359,6 +359,171 @@ let supabase;
             }
         }
 
+        function applyIndexingUi(me) {
+            const enabled = !!me?.features?.indexing;
+            const disabled = document.getElementById('rag-disabled');
+            const controls = document.getElementById('rag-controls');
+            const status = document.getElementById('rag-status');
+            if (disabled) disabled.classList.toggle('hidden', enabled);
+            if (controls) controls.classList.toggle('hidden', !enabled);
+            if (status && !enabled) status.textContent = 'Enable indexing with ENABLE_INDEXING=1 and restart.';
+        }
+
+        function setRagStatus(text) {
+            const el = document.getElementById('rag-status');
+            if (el) el.textContent = text || '';
+        }
+
+        function renderRagDocuments(docs) {
+            const el = document.getElementById('rag-documents');
+            if (!el) return;
+            el.innerHTML = '';
+
+            const list = Array.isArray(docs) ? docs : [];
+            if (!list.length) {
+                const empty = document.createElement('div');
+                empty.className = 'text-xs text-gray-500';
+                empty.textContent = 'No documents yet.';
+                el.appendChild(empty);
+                return;
+            }
+
+            for (const d of list) {
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between gap-2 bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2';
+
+                const left = document.createElement('div');
+                left.className = 'min-w-0';
+                const name = document.createElement('div');
+                name.className = 'text-sm text-gray-100 truncate';
+                name.textContent = d?.name || d?.id || 'document';
+                const meta = document.createElement('div');
+                meta.className = 'text-xs text-gray-500';
+                const bytes = typeof d?.bytes === 'number' ? d.bytes : 0;
+                const chunks = typeof d?.chunks === 'number' ? d.chunks : 0;
+                meta.textContent = `${bytes} bytes • ${chunks} chunks`;
+                left.appendChild(name);
+                left.appendChild(meta);
+
+                const btn = document.createElement('button');
+                btn.className = 'bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs shrink-0';
+                btn.textContent = 'Delete';
+                btn.onclick = () => deleteRagDocument(String(d?.id || ''));
+
+                row.appendChild(left);
+                row.appendChild(btn);
+                el.appendChild(row);
+            }
+        }
+
+        function renderRagResults(results) {
+            const el = document.getElementById('rag-search-results');
+            if (!el) return;
+            el.innerHTML = '';
+
+            const list = Array.isArray(results) ? results : [];
+            if (!list.length) {
+                const empty = document.createElement('div');
+                empty.className = 'text-xs text-gray-500';
+                empty.textContent = 'No results.';
+                el.appendChild(empty);
+                return;
+            }
+
+            for (const r of list) {
+                const card = document.createElement('div');
+                card.className = 'bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2';
+
+                const title = document.createElement('div');
+                title.className = 'text-xs text-gray-400';
+                const score = r?.score ?? 0;
+                const docName = r?.document?.name || r?.document?.id || 'document';
+                title.textContent = `score ${score} • ${docName}`;
+
+                const excerpt = document.createElement('div');
+                excerpt.className = 'text-sm text-gray-100 whitespace-pre-wrap mt-1';
+                excerpt.textContent = r?.excerpt || '';
+
+                card.appendChild(title);
+                card.appendChild(excerpt);
+                el.appendChild(card);
+            }
+        }
+
+        async function loadRagDocuments() {
+            try {
+                setRagStatus('Loading documents...');
+                const res = await authFetch('/api/rag/documents');
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                renderRagDocuments(data?.documents || []);
+                setRagStatus(`Loaded ${Array.isArray(data?.documents) ? data.documents.length : 0} document(s).`);
+            } catch (e) {
+                setRagStatus(`Failed to load documents: ${e?.message || e}`);
+            }
+        }
+
+        async function uploadRagDocument() {
+            const input = document.getElementById('rag-file-input');
+            const file = input?.files?.[0];
+            if (!file) {
+                setRagStatus('Pick a file to upload.');
+                return;
+            }
+            try {
+                setRagStatus('Uploading...');
+                const fd = new FormData();
+                fd.append('file', file, file.name);
+                const res = await authFetch('/api/rag/documents/upload', { method: 'POST', body: fd });
+                if (!res.ok) throw new Error(await res.text());
+                await res.json();
+                if (input) input.value = '';
+                await loadRagDocuments();
+                setRagStatus('Upload complete.');
+            } catch (e) {
+                setRagStatus(`Upload failed: ${e?.message || e}`);
+            }
+        }
+
+        async function deleteRagDocument(docId) {
+            const id = (docId || '').trim();
+            if (!id) return;
+            if (!confirm('Delete this document?')) return;
+            try {
+                setRagStatus('Deleting...');
+                const res = await authFetch(`/api/rag/documents/${encodeURIComponent(id)}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error(await res.text());
+                await res.json();
+                await loadRagDocuments();
+                setRagStatus('Deleted.');
+            } catch (e) {
+                setRagStatus(`Delete failed: ${e?.message || e}`);
+            }
+        }
+
+        async function searchRag() {
+            const q = (document.getElementById('rag-query')?.value || '').trim();
+            if (!q) {
+                setRagStatus('Enter a query.');
+                renderRagResults([]);
+                return;
+            }
+            try {
+                setRagStatus('Searching...');
+                const res = await authFetch('/api/rag/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: q, limit: 8 }),
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                renderRagResults(data?.results || []);
+                setRagStatus(`Found ${Array.isArray(data?.results) ? data.results.length : 0} result(s).`);
+            } catch (e) {
+                setRagStatus(`Search failed: ${e?.message || e}`);
+            }
+        }
+
         async function loadAdminMcpTemplates() {
             const ta = document.getElementById('admin-mcp-templates');
             if (!ta) return;
@@ -427,6 +592,10 @@ let supabase;
                 // Admin/UI capabilities
                 const me = await loadMe();
                 applyAdminUi(me);
+                applyIndexingUi(me);
+                if (me?.features?.indexing) {
+                    loadRagDocuments();
+                }
 
                 // Chat sidebar collapse preference (desktop)
                 if (localStorage.getItem('chat_sidebar_collapsed_v1') === '1') {
@@ -493,6 +662,16 @@ let supabase;
                 // Restore last chat mode (chat/autonomous)
                 const savedMode = localStorage.getItem('chat_mode_v1') || 'chat';
                 setChatMode(savedMode);
+
+                const ragQuery = document.getElementById('rag-query');
+                if (ragQuery) {
+                    ragQuery.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            searchRag();
+                        }
+                    });
+                }
 
                 // Chat bar quick controls
                 setChatAgentTarget(getChatAgentTarget());
