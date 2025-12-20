@@ -1,4 +1,4 @@
-let supabase;
+var supabase = window.__supabaseClient || null;
 
         function isSignupAllowed() {
             const setting = localStorage.getItem('auth_allow_signup_v1');
@@ -83,7 +83,8 @@ let supabase;
                 if (!config.supabase_url || !config.supabase_key) {
                     throw new Error('Supabase configuration missing');
                 }
-                supabase = window.supabase.createClient(config.supabase_url, config.supabase_key);
+                supabase = window.__supabaseClient || window.supabase.createClient(config.supabase_url, config.supabase_key);
+                window.__supabaseClient = supabase;
 
                 // Register toggle (defaults to allowed unless explicitly disabled).
                 const allowSignup = isSignupAllowed();
