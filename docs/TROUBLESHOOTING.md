@@ -81,6 +81,14 @@ If P2P fails, keep “Prefer P2P” off and it will use server WebSockets for me
 Supabase email delivery depends on your project auth settings and SMTP configuration.
 Check Supabase → Authentication → Settings (and SMTP) and verify your site URL/redirect URLs include `/login`.
 
+## Password recovery link opens but “Update password” fails
+
+Some Supabase recovery links include `access_token`/`refresh_token` in the URL hash. This app consumes those tokens and sets a session before calling `updateUser()`.
+
+If it still fails:
+- Verify the link points to your deployed `/login` URL.
+- Verify Supabase Auth → URL Configuration includes your `/login` redirect URL.
+
 ## Vault is disabled
 
 Set `ENABLE_VAULT=1` and restart the container (admins can also toggle the Vault feature override).

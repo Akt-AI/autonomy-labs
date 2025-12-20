@@ -1,5 +1,35 @@
 let supabase;
 
+        function parseHashParams() {
+            const raw = String(window.location.hash || '');
+            const s = raw.startsWith('#') ? raw.slice(1) : raw;
+            try {
+                return new URLSearchParams(s);
+            } catch {
+                return new URLSearchParams();
+            }
+        }
+
+        async function consumeRecoverySessionFromUrl() {
+            if (!supabase) return false;
+            const params = parseHashParams();
+            const type = String(params.get('type') || '').trim().toLowerCase();
+            const access_token = String(params.get('access_token') || '').trim();
+            const refresh_token = String(params.get('refresh_token') || '').trim();
+            if (type !== 'recovery' || !access_token || !refresh_token) return false;
+
+            try {
+                const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+                if (error) throw error;
+                // Clean up the URL to avoid leaking tokens via screenshots/logs.
+                try { history.replaceState({}, '', '/login#type=recovery'); } catch { }
+                return true;
+            } catch (e) {
+                console.error('Failed to set recovery session', e);
+                return false;
+            }
+        }
+
         async function initSupabase() {
             try {
                 const res = await fetch('/config');
@@ -16,6 +46,8 @@ let supabase;
                     registerBtn.style.display = 'none';
                 }
 
+                const recovered = await consumeRecoverySessionFromUrl();
+
                 supabase.auth.onAuthStateChange((event, session) => {
                     if (event === 'PASSWORD_RECOVERY') {
                         showUpdatePanel();
@@ -27,7 +59,7 @@ let supabase;
                     }
                 });
 
-                const recovery = isRecoveryUrl();
+                const recovery = recovered || isRecoveryUrl();
                 const { data: { session } } = await supabase.auth.getSession();
                 if (session && !recovery) {
                     window.location.href = '/app';
@@ -156,7 +188,12 @@ let supabase;
                 showAlert('Reset link sent. Check your email.', 'success');
                 showLoginPanel();
             } catch (e) {
-                showAlert(e?.message || String(e));
+                const msg = e?.message || String(e);
+                if (String(msg).toLowerCase().includes('redirect')) {
+                    showAlert(`${msg}\n\nFix: add ${window.location.origin}/login to Supabase Auth → URL Configuration → Redirect URLs.`);
+                    return;
+                }
+                showAlert(msg);
             }
         });
 
@@ -177,6 +214,8 @@ let supabase;
                 return;
             }
             try {
+                // Some deployments require explicitly consuming tokens from the recovery URL.
+                await consumeRecoverySessionFromUrl();
                 const { error } = await supabase.auth.updateUser({ password: p1 });
                 if (error) throw error;
                 showAlert('Password updated. You can log in now.', 'success');
