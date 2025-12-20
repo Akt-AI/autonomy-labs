@@ -79,7 +79,15 @@ If P2P fails, keep “Prefer P2P” off and it will use server WebSockets for me
 ## Password reset emails aren’t arriving
 
 Supabase email delivery depends on your project auth settings and SMTP configuration.
-Check Supabase → Authentication → Settings (and SMTP) and verify your site URL/redirect URLs include `/login`.
+
+Check:
+- Supabase → Authentication → Providers → **Email** is enabled
+- Supabase → Authentication → URL Configuration:
+  - **Site URL** points to your deployment
+  - **Redirect URLs** includes your `/login` URL
+- Supabase → Authentication → SMTP Settings: configure a real SMTP provider for reliable delivery
+
+Also check Supabase Auth logs for send failures and your inbox spam/quarantine.
 
 ## Password recovery link opens but “Update password” fails
 

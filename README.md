@@ -80,3 +80,4 @@ This repo includes a manual workflow at `.github/workflows/codex-autofix.yml`.
 - **Codex tokens (Spaces Secrets)**: if you already have tokens, set `CODEX_ID_TOKEN`, `CODEX_ACCESS_TOKEN`, `CODEX_REFRESH_TOKEN` (and optionally `CODEX_ACCOUNT_ID`) as Spaces Secrets; the container will write `~/.codex/.auth.json` (and `~/.codex/auth.json`) on startup.
 - **Gemini CLI**: installed as `gemini` via `npm i -g @google/gemini-cli`. Set one of `GEMINI_API_KEY`, `GOOGLE_GENAI_USE_VERTEXAI`, or `GOOGLE_GENAI_USE_GCA` (Spaces Secret recommended).
 - **Git over SSH (web terminal/Docker)**: the container auto-generates `~/.ssh/id_ed25519` on first start and prints the public key; add it to your Git provider, then use `git@github.com:ORG/REPO.git` URLs. To provide a key via Secrets instead, set `SSH_PRIVATE_KEY` (and optionally `SSH_PUBLIC_KEY`, `SSH_KNOWN_HOSTS`).
+- **GitHub indexing token**: for private repos or higher rate limits, set `GITHUB_TOKEN` or `GITHUB_PAT` as a Secret.

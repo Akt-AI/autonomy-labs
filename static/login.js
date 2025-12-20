@@ -312,7 +312,11 @@ var supabaseReady = false;
                 const redirectTo = `${window.location.origin}/login`;
                 const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
                 if (error) throw error;
-                showAlert('Reset link sent. Check your email.', 'success');
+                showAlert(
+                    'Reset link sent. Check your email (and spam).\n\n' +
+                    'If you do not receive it, configure SMTP in Supabase Auth settings and verify Redirect URLs include /login.',
+                    'success',
+                );
                 showLoginPanel();
             } catch (e) {
                 const msg = e?.message || String(e);
