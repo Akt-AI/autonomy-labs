@@ -51,6 +51,11 @@ def test_rooms_ws_requires_token(client: TestClient):
         assert "missing_token" in msg or msg == ""
 
 
+def test_room_members_requires_auth(client: TestClient):
+    res = client.get("/api/rooms/x/members")
+    assert res.status_code == 401
+
+
 def test_features_can_be_disabled(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("SUPABASE_KEY", "dummy")

@@ -56,7 +56,7 @@ Legend:
 - [x] Jobs UI (MVP: start/cancel/list crawl jobs).
 
 ## P3 — P2P pubsub chat + account manager
-- [ ] Account manager: identities/devices, memberships, permissions, moderation.
+- [~] Account manager: identities/devices, memberships, permissions, moderation.
 - [~] Transport: WebRTC DataChannel + signaling, with server pubsub fallback.
 - [~] UX: rooms, presence, delivery status, network mode indicators.
 
@@ -67,3 +67,6 @@ Legend:
 
 ## P2/P3 — UI consolidation (nice-to-have)
 - [ ] Merge Autonomous mode and chat mode to a single chat UI.
+
+## P2 — Auth UX
+- [x] Password reset by email (Supabase recovery flow).

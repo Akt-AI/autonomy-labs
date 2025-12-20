@@ -76,6 +76,9 @@ async def join_room(body: dict[str, Any], http_request: Request):
     if not room_id:
         raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "roomId is required"})
     store: RoomsStore = http_request.app.state.rooms_store
+    room = await store.get_room(room_id)
+    if room and user_id in room.banned:
+        raise HTTPException(status_code=403, detail={"code": "banned", "message": "You are banned from this room"})
     room = await store.join_room(room_id=room_id, user_id=user_id)
     if not room:
         raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Unknown roomId"})
@@ -107,6 +110,93 @@ async def room_messages(room_id: str, http_request: Request, limit: int = 50):
         raise HTTPException(status_code=403, detail={"code": "not_member", "message": "Join the room first"})
     messages = await store.read_messages(room_id=room_id, limit=limit)
     return {"messages": messages}
+
+
+@router.get("/api/rooms/{room_id}/members")
+async def room_members(room_id: str, http_request: Request):
+    if not feature_enabled("rooms"):
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Rooms are disabled"})
+    user = await require_user_from_request(http_request)
+    user_id = str(user.get("id") or "")
+    store: RoomsStore = http_request.app.state.rooms_store
+    room = await store.get_room(room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Unknown roomId"})
+    if user_id not in room.members:
+        raise HTTPException(status_code=403, detail={"code": "not_member", "message": "Join the room first"})
+    members = await store.list_members(room_id=room_id)
+    return {"members": members or [], "myRole": room.roles.get(user_id, "member")}
+
+
+@router.post("/api/rooms/{room_id}/kick")
+async def room_kick(room_id: str, body: dict[str, Any], http_request: Request):
+    if not feature_enabled("rooms"):
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Rooms are disabled"})
+    user = await require_user_from_request(http_request)
+    actor_id = str(user.get("id") or "")
+    target_id = str((body or {}).get("userId") or "").strip()
+    if not target_id:
+        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "userId is required"})
+    store: RoomsStore = http_request.app.state.rooms_store
+    room = await store.get_room(room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Unknown roomId"})
+    if actor_id not in room.members:
+        raise HTTPException(status_code=403, detail={"code": "not_member", "message": "Join the room first"})
+    actor_role = (room.roles.get(actor_id) or "member").lower()
+    if actor_role not in {"owner", "moderator"}:
+        raise HTTPException(status_code=403, detail={"code": "forbidden", "message": "Insufficient privileges"})
+    if target_id == room.owner_user_id:
+        raise HTTPException(status_code=403, detail={"code": "forbidden", "message": "Cannot kick the owner"})
+    ok = await store.kick_member(room_id=room_id, user_id=target_id)
+    return {"ok": True, "kicked": ok}
+
+
+@router.post("/api/rooms/{room_id}/ban")
+async def room_ban(room_id: str, body: dict[str, Any], http_request: Request):
+    if not feature_enabled("rooms"):
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Rooms are disabled"})
+    user = await require_user_from_request(http_request)
+    actor_id = str(user.get("id") or "")
+    target_id = str((body or {}).get("userId") or "").strip()
+    if not target_id:
+        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "userId is required"})
+    store: RoomsStore = http_request.app.state.rooms_store
+    room = await store.get_room(room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Unknown roomId"})
+    if actor_id not in room.members:
+        raise HTTPException(status_code=403, detail={"code": "not_member", "message": "Join the room first"})
+    actor_role = (room.roles.get(actor_id) or "member").lower()
+    if actor_role not in {"owner", "moderator"}:
+        raise HTTPException(status_code=403, detail={"code": "forbidden", "message": "Insufficient privileges"})
+    if target_id == room.owner_user_id:
+        raise HTTPException(status_code=403, detail={"code": "forbidden", "message": "Cannot ban the owner"})
+    ok = await store.ban_member(room_id=room_id, user_id=target_id)
+    return {"ok": True, "banned": ok}
+
+
+@router.put("/api/rooms/{room_id}/roles")
+async def room_set_role(room_id: str, body: dict[str, Any], http_request: Request):
+    if not feature_enabled("rooms"):
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Rooms are disabled"})
+    user = await require_user_from_request(http_request)
+    actor_id = str(user.get("id") or "")
+    target_id = str((body or {}).get("userId") or "").strip()
+    role = str((body or {}).get("role") or "").strip().lower()
+    if not target_id or not role:
+        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "userId and role are required"})
+    store: RoomsStore = http_request.app.state.rooms_store
+    room = await store.get_room(room_id)
+    if not room:
+        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Unknown roomId"})
+    if actor_id not in room.members:
+        raise HTTPException(status_code=403, detail={"code": "not_member", "message": "Join the room first"})
+    actor_role = (room.roles.get(actor_id) or "member").lower()
+    if actor_role != "owner":
+        raise HTTPException(status_code=403, detail={"code": "forbidden", "message": "Owner privileges required"})
+    ok = await store.set_role(room_id=room_id, user_id=target_id, role=role)
+    return {"ok": True, "updated": ok}
 
 
 @router.get("/api/rooms/{room_id}/peers")
@@ -166,6 +256,11 @@ async def websocket_rooms(websocket: WebSocket):
 
     user_id = str(user.get("id") or "")
     store: RoomsStore = websocket.app.state.rooms_store
+    room = await store.get_room(room_id)
+    if room and user_id in room.banned:
+        await websocket.send_text(_ws_json({"type": "error", "message": "banned"}))
+        await websocket.close()
+        return
     room = await store.join_room(room_id=room_id, user_id=user_id)
     if not room:
         await websocket.send_text(_ws_json({"type": "error", "message": "unknown_room"}))

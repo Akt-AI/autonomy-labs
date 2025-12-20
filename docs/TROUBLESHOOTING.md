@@ -75,3 +75,8 @@ Admins can also toggle feature overrides from Settings → Admin.
 
 The Rooms view uses WebRTC DataChannels (optional, behind “Prefer P2P”). Some networks block UDP/WebRTC.
 If P2P fails, keep “Prefer P2P” off and it will use server WebSockets for messaging.
+
+## Password reset emails aren’t arriving
+
+Supabase email delivery depends on your project auth settings and SMTP configuration.
+Check Supabase → Authentication → Settings (and SMTP) and verify your site URL/redirect URLs include `/login`.

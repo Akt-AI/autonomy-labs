@@ -30,6 +30,11 @@
                     required>
             </div>
 
+            <div class="flex items-center justify-between text-sm">
+                <button type="button" id="forgot-btn"
+                    class="text-gray-300 hover:text-white underline underline-offset-2">Forgot password?</button>
+            </div>
+
             <div class="flex space-x-4">
                 <button type="submit" id="login-btn"
                     class="w-full px-5 py-2.5 text-sm font-medium bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-800">Login</button>
@@ -37,6 +42,47 @@
                     class="w-full px-5 py-2.5 text-sm font-medium bg-green-600 rounded-lg hover:bg-green-700 focus:ring-4 focus:ring-green-800">Register</button>
             </div>
         </form>
+
+        <div id="reset-panel" class="hidden space-y-4">
+            <div class="text-sm text-gray-300">
+                <div class="font-semibold text-gray-100">Reset password</div>
+                <div class="text-gray-400">Enter your email to receive a reset link.</div>
+            </div>
+            <div>
+                <label for="reset-email" class="block mb-2 text-sm font-medium">Email</label>
+                <input type="email" id="reset-email"
+                    class="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div class="flex gap-2">
+                <button type="button" id="send-reset-btn"
+                    class="flex-1 px-5 py-2.5 text-sm font-medium bg-indigo-600 rounded-lg hover:bg-indigo-700 focus:ring-4 focus:ring-indigo-800">Send link</button>
+                <button type="button" id="cancel-reset-btn"
+                    class="px-5 py-2.5 text-sm font-medium bg-gray-700 rounded-lg hover:bg-gray-600">Cancel</button>
+            </div>
+        </div>
+
+        <div id="update-panel" class="hidden space-y-4">
+            <div class="text-sm text-gray-300">
+                <div class="font-semibold text-gray-100">Set a new password</div>
+                <div class="text-gray-400">You opened a password recovery link. Choose a new password.</div>
+            </div>
+            <div>
+                <label for="new-password" class="block mb-2 text-sm font-medium">New password</label>
+                <input type="password" id="new-password"
+                    class="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div>
+                <label for="confirm-password" class="block mb-2 text-sm font-medium">Confirm password</label>
+                <input type="password" id="confirm-password"
+                    class="w-full p-2.5 bg-gray-700 border border-gray-600 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+            </div>
+            <div class="flex gap-2">
+                <button type="button" id="update-password-btn"
+                    class="flex-1 px-5 py-2.5 text-sm font-medium bg-green-600 rounded-lg hover:bg-green-700 focus:ring-4 focus:ring-green-800">Update password</button>
+                <button type="button" id="cancel-update-btn"
+                    class="px-5 py-2.5 text-sm font-medium bg-gray-700 rounded-lg hover:bg-gray-600">Cancel</button>
+            </div>
+        </div>
     </div>
     <script src="/static/login.js"></script>
 </body>

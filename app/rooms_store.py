@@ -38,6 +38,8 @@ class Room:
     created_at: str
     owner_user_id: str
     members: set[str] = field(default_factory=set)
+    roles: dict[str, str] = field(default_factory=dict)  # user_id -> role
+    banned: set[str] = field(default_factory=set)  # user_id
 
     def to_public(self, *, for_user_id: str) -> dict[str, Any]:
         return {
@@ -47,6 +49,7 @@ class Room:
             "ownerUserId": self.owner_user_id,
             "memberCount": len(self.members),
             "isMember": for_user_id in self.members,
+            "myRole": self.roles.get(for_user_id) if for_user_id in self.members else None,
         }
 
 
@@ -82,9 +85,26 @@ class RoomsStore:
             created_at = str(r.get("createdAt") or _now_iso()).strip()
             owner = str(r.get("ownerUserId") or "").strip()
             members = set(str(x) for x in (r.get("members") or []) if str(x).strip())
+            roles_raw = r.get("roles") if isinstance(r, dict) else None
+            roles: dict[str, str] = {}
+            if isinstance(roles_raw, dict):
+                for k, v in roles_raw.items():
+                    uid = str(k).strip()
+                    role = str(v).strip().lower()
+                    if uid and role:
+                        roles[uid] = role
+            banned = set(str(x) for x in (r.get("banned") or []) if str(x).strip())
             if not rid or not owner:
                 continue
-            self._rooms[rid] = Room(id=rid, name=name, created_at=created_at, owner_user_id=owner, members=members)
+            self._rooms[rid] = Room(
+                id=rid,
+                name=name,
+                created_at=created_at,
+                owner_user_id=owner,
+                members=members,
+                roles=roles,
+                banned=banned,
+            )
 
     def _save(self) -> None:
         path = _rooms_path()
@@ -98,6 +118,8 @@ class RoomsStore:
                     "createdAt": r.created_at,
                     "ownerUserId": r.owner_user_id,
                     "members": sorted(r.members),
+                    "roles": r.roles,
+                    "banned": sorted(r.banned),
                 }
             )
         payload = {"version": 1, "rooms": rooms}
@@ -119,7 +141,14 @@ class RoomsStore:
             raise ValueError("user_id required")
         room_id = str(uuid.uuid4())
         nm = (name or "Room").strip()[:80] or "Room"
-        room = Room(id=room_id, name=nm, created_at=_now_iso(), owner_user_id=uid, members={uid})
+        room = Room(
+            id=room_id,
+            name=nm,
+            created_at=_now_iso(),
+            owner_user_id=uid,
+            members={uid},
+            roles={uid: "owner"},
+        )
         async with self._lock:
             self._rooms[room_id] = room
             self._save()
@@ -139,7 +168,11 @@ class RoomsStore:
             room = self._rooms.get(rid)
             if not room:
                 return None
+            if uid in room.banned:
+                return None
             room.members.add(uid)
+            if uid not in room.roles:
+                room.roles[uid] = "member"
             self._save()
             return room
 
@@ -153,9 +186,72 @@ class RoomsStore:
             if not room:
                 return False
             room.members.discard(uid)
+            room.roles.pop(uid, None)
             # Owner-less or empty rooms are pruned.
             if not room.members or room.owner_user_id not in room.members:
                 self._rooms.pop(rid, None)
+            self._save()
+            return True
+
+    async def list_members(self, *, room_id: str) -> list[dict[str, Any]] | None:
+        rid = str(room_id or "").strip()
+        async with self._lock:
+            room = self._rooms.get(rid)
+            if not room:
+                return None
+            members = []
+            for uid in sorted(room.members):
+                members.append({"userId": uid, "role": room.roles.get(uid, "member")})
+            return members
+
+    async def set_role(self, *, room_id: str, user_id: str, role: str) -> bool:
+        rid = str(room_id or "").strip()
+        uid = str(user_id or "").strip()
+        r = str(role or "").strip().lower()
+        if not rid or not uid:
+            return False
+        if r not in {"owner", "moderator", "member"}:
+            return False
+        async with self._lock:
+            room = self._rooms.get(rid)
+            if not room or uid not in room.members:
+                return False
+            room.roles[uid] = r
+            if r == "owner":
+                room.owner_user_id = uid
+            self._save()
+            return True
+
+    async def kick_member(self, *, room_id: str, user_id: str) -> bool:
+        rid = str(room_id or "").strip()
+        uid = str(user_id or "").strip()
+        if not rid or not uid:
+            return False
+        async with self._lock:
+            room = self._rooms.get(rid)
+            if not room:
+                return False
+            if uid == room.owner_user_id:
+                return False
+            room.members.discard(uid)
+            room.roles.pop(uid, None)
+            self._save()
+            return True
+
+    async def ban_member(self, *, room_id: str, user_id: str) -> bool:
+        rid = str(room_id or "").strip()
+        uid = str(user_id or "").strip()
+        if not rid or not uid:
+            return False
+        async with self._lock:
+            room = self._rooms.get(rid)
+            if not room:
+                return False
+            if uid == room.owner_user_id:
+                return False
+            room.banned.add(uid)
+            room.members.discard(uid)
+            room.roles.pop(uid, None)
             self._save()
             return True
 

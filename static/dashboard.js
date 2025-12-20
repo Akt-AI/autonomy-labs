@@ -913,6 +913,7 @@ let supabase;
                     const { data: userData } = await supabase.auth.getUser();
                     const user = userData?.user;
                     if (user) {
+                        window.__sbUserId = (user.id || '').trim();
                         const username =
                             user.user_metadata?.username ||
                             user.user_metadata?.name ||
@@ -3205,6 +3206,135 @@ let supabase;
             if (el) el.textContent = text || '';
         }
 
+        function setRoomsMembersStatus(text) {
+            const el = document.getElementById('rooms-members-status');
+            if (el) el.textContent = text || '';
+        }
+
+        function setRoomsMyRole(role) {
+            const el = document.getElementById('rooms-my-role');
+            if (!el) return;
+            el.textContent = `role: ${role || '—'}`;
+        }
+
+        function toggleRoomsMembers(forceOpen = null) {
+            const panel = document.getElementById('rooms-members-panel');
+            if (!panel) return;
+            const open = forceOpen == null ? panel.classList.contains('hidden') : !!forceOpen;
+            panel.classList.toggle('hidden', !open);
+        }
+
+        function renderRoomMembers(data) {
+            const el = document.getElementById('rooms-members');
+            if (!el) return;
+            el.innerHTML = '';
+            const members = Array.isArray(data?.members) ? data.members : [];
+            const myRole = String(data?.myRole || '').trim();
+            setRoomsMyRole(myRole || 'member');
+
+            if (!members.length) {
+                const empty = document.createElement('div');
+                empty.className = 'text-gray-500';
+                empty.textContent = 'No members.';
+                el.appendChild(empty);
+                return;
+            }
+            for (const m of members) {
+                const uid = String(m?.userId || '').trim();
+                const role = String(m?.role || 'member').trim();
+                if (!uid) continue;
+
+                const card = document.createElement('div');
+                card.className = 'bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2 flex items-center justify-between gap-2';
+
+                const left = document.createElement('div');
+                left.className = 'min-w-0';
+                const a = document.createElement('div');
+                a.className = 'text-gray-100 font-semibold truncate';
+                a.textContent = uid.slice(0, 12);
+                const b = document.createElement('div');
+                b.className = 'text-gray-400 truncate';
+                b.textContent = role;
+                left.appendChild(a);
+                left.appendChild(b);
+
+                const actions = document.createElement('div');
+                actions.className = 'flex items-center gap-2 shrink-0';
+
+                const canModerate = myRole === 'owner' || myRole === 'moderator';
+                const selfUserId = (window.__sbUserId || '').trim();
+                const isSelf = selfUserId && uid === selfUserId;
+                const isOwner = role === 'owner';
+                if (canModerate && !isSelf && !isOwner) {
+                    const kick = document.createElement('button');
+                    kick.className = 'bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs';
+                    kick.textContent = 'Kick';
+                    kick.onclick = () => kickRoomMember(uid);
+
+                    const ban = document.createElement('button');
+                    ban.className = 'bg-red-700 hover:bg-red-600 text-white px-2 py-1 rounded text-xs';
+                    ban.textContent = 'Ban';
+                    ban.onclick = () => banRoomMember(uid);
+
+                    actions.appendChild(kick);
+                    actions.appendChild(ban);
+                }
+
+                card.appendChild(left);
+                card.appendChild(actions);
+                el.appendChild(card);
+            }
+        }
+
+        async function loadRoomMembers() {
+            const rid = roomsActiveRoomId;
+            if (!rid) return;
+            try {
+                setRoomsMembersStatus('Loading…');
+                const res = await authFetch(`/api/rooms/${encodeURIComponent(rid)}/members`);
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                renderRoomMembers(data);
+                setRoomsMembersStatus('');
+            } catch (e) {
+                setRoomsMembersStatus(`Failed: ${e?.message || e}`);
+            }
+        }
+
+        async function kickRoomMember(userId) {
+            const rid = roomsActiveRoomId;
+            if (!rid) return;
+            if (!confirm(`Kick ${String(userId).slice(0, 12)}?`)) return;
+            try {
+                const res = await authFetch(`/api/rooms/${encodeURIComponent(rid)}/kick`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId }),
+                });
+                if (!res.ok) throw new Error(await res.text());
+                await loadRoomMembers();
+            } catch (e) {
+                alert(`Kick failed: ${e?.message || e}`);
+            }
+        }
+
+        async function banRoomMember(userId) {
+            const rid = roomsActiveRoomId;
+            if (!rid) return;
+            if (!confirm(`Ban ${String(userId).slice(0, 12)}?`)) return;
+            try {
+                const res = await authFetch(`/api/rooms/${encodeURIComponent(rid)}/ban`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId }),
+                });
+                if (!res.ok) throw new Error(await res.text());
+                await loadRoomMembers();
+            } catch (e) {
+                alert(`Ban failed: ${e?.message || e}`);
+            }
+        }
+
         function renderRoomsMessagesEmpty(text) {
             const box = document.getElementById('rooms-messages');
             if (!box) return;
@@ -3390,8 +3520,11 @@ let supabase;
             roomsMessageEls = new Map();
             updateRoomsHeader(roomsActiveRoomId, name || 'Room');
             renderRoomsMessagesEmpty('Loading…');
+            setRoomsMyRole('');
+            toggleRoomsMembers(false);
             await loadRoomsList();
             await loadRoomHistory();
+            await loadRoomMembers();
             await connectRoomsWs();
         }
 

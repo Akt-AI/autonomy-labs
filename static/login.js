@@ -16,15 +16,71 @@ let supabase;
                     registerBtn.style.display = 'none';
                 }
 
-                // Check if already logged in
+                supabase.auth.onAuthStateChange((event, session) => {
+                    if (event === 'PASSWORD_RECOVERY') {
+                        showUpdatePanel();
+                        return;
+                    }
+                    const recovery = isRecoveryUrl();
+                    if (session && !recovery) {
+                        window.location.href = '/app';
+                    }
+                });
+
+                const recovery = isRecoveryUrl();
                 const { data: { session } } = await supabase.auth.getSession();
-                if (session) {
+                if (session && !recovery) {
                     window.location.href = '/app';
+                    return;
+                }
+                if (recovery) {
+                    showUpdatePanel();
+                } else {
+                    showLoginPanel();
                 }
             } catch (error) {
                 console.error('Error initializing Supabase:', error);
                 showAlert('Error initializing application configuration', 'error');
             }
+        }
+
+        function isRecoveryUrl() {
+            const hash = String(window.location.hash || '');
+            const search = String(window.location.search || '');
+            return hash.includes('type=recovery') || search.includes('type=recovery') || hash.includes('recovery');
+        }
+
+        function getPanels() {
+            return {
+                login: document.getElementById('auth-form'),
+                reset: document.getElementById('reset-panel'),
+                update: document.getElementById('update-panel'),
+            };
+        }
+
+        function showLoginPanel() {
+            const { login, reset, update } = getPanels();
+            if (login) login.classList.remove('hidden');
+            if (reset) reset.classList.add('hidden');
+            if (update) update.classList.add('hidden');
+        }
+
+        function showResetPanel() {
+            const { login, reset, update } = getPanels();
+            if (login) login.classList.add('hidden');
+            if (reset) reset.classList.remove('hidden');
+            if (update) update.classList.add('hidden');
+
+            const email = document.getElementById('email')?.value || '';
+            const el = document.getElementById('reset-email');
+            if (el && email) el.value = email;
+        }
+
+        function showUpdatePanel() {
+            const { login, reset, update } = getPanels();
+            if (login) login.classList.add('hidden');
+            if (reset) reset.classList.add('hidden');
+            if (update) update.classList.remove('hidden');
         }
 
         function showAlert(message, type = 'error') {
@@ -77,6 +133,58 @@ let supabase;
         document.getElementById('auth-form').addEventListener('submit', (e) => {
             e.preventDefault();
             handleAuth('login');
+        });
+
+        document.getElementById('forgot-btn').addEventListener('click', () => {
+            showResetPanel();
+        });
+
+        document.getElementById('cancel-reset-btn').addEventListener('click', () => {
+            showLoginPanel();
+        });
+
+        document.getElementById('send-reset-btn').addEventListener('click', async () => {
+            const email = (document.getElementById('reset-email')?.value || '').trim();
+            if (!email) {
+                showAlert('Enter your email to receive a reset link.');
+                return;
+            }
+            try {
+                const redirectTo = `${window.location.origin}/login`;
+                const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+                if (error) throw error;
+                showAlert('Reset link sent. Check your email.', 'success');
+                showLoginPanel();
+            } catch (e) {
+                showAlert(e?.message || String(e));
+            }
+        });
+
+        document.getElementById('cancel-update-btn').addEventListener('click', async () => {
+            try { await supabase.auth.signOut(); } catch { }
+            window.location.replace('/login');
+        });
+
+        document.getElementById('update-password-btn').addEventListener('click', async () => {
+            const p1 = (document.getElementById('new-password')?.value || '').trim();
+            const p2 = (document.getElementById('confirm-password')?.value || '').trim();
+            if (!p1 || p1.length < 8) {
+                showAlert('Password must be at least 8 characters.');
+                return;
+            }
+            if (p1 !== p2) {
+                showAlert('Passwords do not match.');
+                return;
+            }
+            try {
+                const { error } = await supabase.auth.updateUser({ password: p1 });
+                if (error) throw error;
+                showAlert('Password updated. You can log in now.', 'success');
+                try { await supabase.auth.signOut(); } catch { }
+                window.location.replace('/login');
+            } catch (e) {
+                showAlert(e?.message || String(e));
+            }
         });
 
         document.getElementById('register-btn').addEventListener('click', () => {
