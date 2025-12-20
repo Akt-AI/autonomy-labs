@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Request
@@ -17,6 +18,15 @@ def _is_admin(user: dict[str, Any]) -> bool:
     # Minimal heuristic; can be replaced with Supabase custom claims / RLS-backed roles later.
     meta = user.get("user_metadata") or {}
     if isinstance(meta, dict) and meta.get("is_admin") is True:
+        return True
+    email = str(user.get("email") or "").strip().lower()
+    user_id = str(user.get("id") or "").strip()
+
+    admin_emails = {e.strip().lower() for e in (os.environ.get("ADMIN_EMAILS") or "").split(",") if e.strip()}
+    admin_ids = {e.strip() for e in (os.environ.get("ADMIN_USER_IDS") or "").split(",") if e.strip()}
+    if email and email in admin_emails:
+        return True
+    if user_id and user_id in admin_ids:
         return True
     return False
 
@@ -83,4 +93,3 @@ async def put_mcp_registry(body: McpRegistry, http_request: Request):
         return {"ok": True, "count": len(servers)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-

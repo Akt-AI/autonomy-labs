@@ -181,6 +181,8 @@ let supabase;
             openSettings();
             const admin = document.getElementById('admin-panel');
             if (admin) admin.scrollIntoView({ block: 'nearest' });
+            // Best-effort auto-load templates for admins.
+            setTimeout(() => loadAdminMcpTemplates(), 0);
         }
 
         function closeSettings() {
@@ -354,6 +356,39 @@ let supabase;
                     `<div class=\"bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2\">mcp: <span class=\"text-gray-100\">${f.mcp ? 'on' : 'off'}</span></div>`,
                     `<div class=\"bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2\">indexing: <span class=\"text-gray-100\">${f.indexing ? 'on' : 'off'}</span></div>`,
                 ].join('');
+            }
+        }
+
+        async function loadAdminMcpTemplates() {
+            const ta = document.getElementById('admin-mcp-templates');
+            if (!ta) return;
+            try {
+                const res = await authFetch('/api/admin/mcp-templates');
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                ta.value = JSON.stringify(data, null, 2);
+            } catch (e) {
+                // Non-admins will get 403; don't spam.
+                if (String(e?.message || e).includes('403')) return;
+                console.warn('Failed to load MCP templates', e);
+            }
+        }
+
+        async function saveAdminMcpTemplates() {
+            const ta = document.getElementById('admin-mcp-templates');
+            if (!ta) return;
+            try {
+                const parsed = JSON.parse(ta.value || '{}');
+                const res = await authFetch('/api/admin/mcp-templates', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(parsed),
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                alert(`Saved templates (${data?.count ?? 0})`);
+            } catch (e) {
+                alert(`Failed to save templates: ${e?.message || e}`);
             }
         }
 

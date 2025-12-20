@@ -23,7 +23,7 @@ Legend:
 - [x] Landing + route split (`/` landing, `/login`, `/app`) and UI redirects updated.
 - [x] Split `static/dashboard.html` into JS/CSS files (`static/dashboard.js`, `static/dashboard.css`).
 - [~] Theme tokens shared across login + dashboard (single source of truth via `static/theme.css`).
-- [ ] Separate Settings vs Admin dashboard (dedicated pages/sections + RBAC).
+- [~] Separate Settings vs Admin dashboard (admin section scaffolded; full dedicated pages pending).
 
 ## P2 — Provider auth parity (Codex/Gemini/Claude)
 - [x] Codex auth file generation from env/secrets (`~/.codex/.auth.json` and `~/.codex/auth.json`).
@@ -42,7 +42,8 @@ Legend:
 
 ## P2/P3 — MCP registry
 - [~] First-class MCP registry storage (per-user persistence via backend).
-- [ ] “Test connection”, “list tools”, tool allow/deny UI.
+- [~] Admin-managed MCP templates (server-side persisted).
+- [ ] “Test connection”, “list tools”, tool allow/deny UI (SSRF-safe).
 - [ ] Import/export `mcp.json` via UI with validation.
 
 ## P3 — RAG + indexing (docs/web/GitHub) + “password manager”
