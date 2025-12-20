@@ -16,7 +16,10 @@ def feature_enabled(feature: str) -> bool:
     """
     Safety: when Supabase isn't configured, disable dangerous features by default.
     """
-    has_supabase = bool(os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_KEY"))
+    has_supabase = bool(
+        os.environ.get("SUPABASE_URL")
+        and (os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_ANON_KEY"))
+    )
     if not has_supabase:
         return False
     defaults = {

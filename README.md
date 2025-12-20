@@ -29,7 +29,8 @@ Create a `.env` file (or set env vars):
 
 ```bash
 SUPABASE_URL=...
-SUPABASE_KEY=...          # Supabase anon key used by the frontend
+SUPABASE_KEY=...          # Supabase anon key used by the frontend (or SUPABASE_ANON_KEY)
+SUPABASE_SERVICE_ROLE_KEY=...  # optional: required for admin user deletion/pruning
 DEFAULT_BASE_URL=https://router.huggingface.co/v1
 DEFAULT_API_KEY=...       # optional default for UI (avoid committing secrets)
 DEFAULT_MODEL=gpt-3.5-turbo

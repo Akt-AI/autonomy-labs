@@ -200,6 +200,7 @@ let supabase;
             setTimeout(() => {
                 loadAdminFeatureOverrides();
                 loadAdminMcpTemplates();
+                loadAdminUsers();
             }, 0);
         }
 
@@ -849,6 +850,128 @@ let supabase;
             }
         }
 
+        function setAdminUsersStatus(msg) {
+            const el = document.getElementById('admin-users-status');
+            if (el) el.textContent = msg || '';
+        }
+
+        function formatAdminTimestamp(value) {
+            if (!value) return 'unknown';
+            const dt = new Date(value);
+            if (Number.isNaN(dt.getTime())) return 'unknown';
+            return dt.toLocaleString();
+        }
+
+        function renderAdminUsers(users) {
+            const el = document.getElementById('admin-users-list');
+            if (!el) return;
+            el.innerHTML = '';
+            const list = Array.isArray(users) ? users : [];
+            if (!list.length) {
+                const empty = document.createElement('div');
+                empty.className = 'text-xs text-gray-500';
+                empty.textContent = 'No users returned.';
+                el.appendChild(empty);
+                return;
+            }
+
+            const selfId = (window.__sbUserId || '').trim();
+            for (const u of list) {
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between gap-2 bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2';
+
+                const left = document.createElement('div');
+                left.className = 'min-w-0';
+                const title = document.createElement('div');
+                title.className = 'text-sm text-gray-100 truncate';
+                const email = u?.email || '';
+                const uid = u?.id || '';
+                title.textContent = email ? `${email}` : `${uid}`;
+                const meta = document.createElement('div');
+                meta.className = 'text-xs text-gray-500';
+                const created = formatAdminTimestamp(u?.created_at);
+                const lastSignIn = formatAdminTimestamp(u?.last_sign_in_at);
+                meta.textContent = `created ${created} • last sign-in ${lastSignIn}`;
+                left.appendChild(title);
+                left.appendChild(meta);
+
+                const right = document.createElement('div');
+                right.className = 'shrink-0 flex items-center gap-2';
+                if (selfId && uid === selfId) {
+                    const badge = document.createElement('div');
+                    badge.className = 'text-xs text-gray-400';
+                    badge.textContent = 'You';
+                    right.appendChild(badge);
+                } else {
+                    const btn = document.createElement('button');
+                    btn.className = 'bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs';
+                    btn.textContent = 'Delete';
+                    btn.onclick = () => deleteAdminUser(String(uid || ''));
+                    right.appendChild(btn);
+                }
+
+                row.appendChild(left);
+                row.appendChild(right);
+                el.appendChild(row);
+            }
+        }
+
+        async function loadAdminUsers(page = 1) {
+            try {
+                setAdminUsersStatus('Loading users...');
+                const res = await authFetch(`/api/admin/users?page=${encodeURIComponent(page)}&perPage=50`);
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                renderAdminUsers(data?.users || []);
+                const count = Array.isArray(data?.users) ? data.users.length : 0;
+                setAdminUsersStatus(`Loaded ${count} user(s).`);
+            } catch (e) {
+                const msg = String(e?.message || e);
+                setAdminUsersStatus(`Load failed: ${msg}`);
+            }
+        }
+
+        async function deleteAdminUser(userId) {
+            const id = (userId || '').trim();
+            if (!id) return;
+            if (!confirm('Delete this user?')) return;
+            try {
+                setAdminUsersStatus('Deleting user...');
+                const res = await authFetch(`/api/admin/users/${encodeURIComponent(id)}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error(await res.text());
+                await res.json();
+                setAdminUsersStatus('User deleted.');
+                loadAdminUsers();
+            } catch (e) {
+                setAdminUsersStatus(`Delete failed: ${e?.message || e}`);
+            }
+        }
+
+        async function pruneAdminUsers() {
+            const days = Number(document.getElementById('admin-users-prune-days')?.value || 90);
+            const maxDelete = Number(document.getElementById('admin-users-prune-max')?.value || 50);
+            const inactiveOnly = !!document.getElementById('admin-users-prune-inactive')?.checked;
+            if (!confirm('Delete old users? This cannot be undone.')) return;
+            try {
+                setAdminUsersStatus('Pruning users...');
+                const res = await authFetch('/api/admin/users/prune', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        olderThanDays: days,
+                        inactiveOnly,
+                        maxDelete,
+                    }),
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                setAdminUsersStatus(`Deleted ${data?.count ?? 0} user(s).`);
+                loadAdminUsers();
+            } catch (e) {
+                setAdminUsersStatus(`Prune failed: ${e?.message || e}`);
+            }
+        }
+
         async function refreshCodexMcpServers() {
             const out = document.getElementById('codex-mcp-list');
             if (out) out.textContent = 'Loading...';
@@ -883,6 +1006,8 @@ let supabase;
 
                 // Admin/UI capabilities
                 const me = await loadMe();
+                window.__me = me;
+                if (me?.id) window.__sbUserId = String(me.id).trim();
                 applyAdminUi(me);
                 applyIndexingUi(me);
                 applyVaultUi(me);
@@ -898,7 +1023,7 @@ let supabase;
 
                 // Access preferences
                 if (localStorage.getItem('auth_allow_signup_v1') == null) {
-                    localStorage.setItem('auth_allow_signup_v1', '0');
+                    localStorage.setItem('auth_allow_signup_v1', '1');
                 }
                 // Codex SDK defaults (separate from chat provider)
                 if (localStorage.getItem('codex_sdk_base_url_v1') == null) {

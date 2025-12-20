@@ -2,13 +2,14 @@
 
 ## Defaults
 
-If Supabase is not configured (`SUPABASE_URL` + `SUPABASE_KEY` missing), dangerous features are disabled by default.
+If Supabase is not configured (`SUPABASE_URL` + `SUPABASE_KEY`/`SUPABASE_ANON_KEY` missing), dangerous features are disabled by default.
 
 ## Recommended settings (HF Spaces)
 
 Use Spaces Secrets for:
 - `SUPABASE_URL`
-- `SUPABASE_KEY`
+- `SUPABASE_KEY` (or `SUPABASE_ANON_KEY`)
+- `SUPABASE_SERVICE_ROLE_KEY` (optional: required for admin user deletion/pruning)
 - Codex tokens (if using token-based auth) or use device auth inside terminal
 - provider API keys (Gemini/Claude/OpenAI-compatible) as needed
 

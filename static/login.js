@@ -1,5 +1,14 @@
 let supabase;
 
+        function isSignupAllowed() {
+            const setting = localStorage.getItem('auth_allow_signup_v1');
+            if (setting == null) {
+                localStorage.setItem('auth_allow_signup_v1', '1');
+                return true;
+            }
+            return setting === '1';
+        }
+
         function parseUrlParams() {
             const search = new URLSearchParams(String(window.location.search || ''));
             const rawHash = String(window.location.hash || '');
@@ -50,8 +59,8 @@ let supabase;
                 }
                 supabase = window.supabase.createClient(config.supabase_url, config.supabase_key);
 
-                // Register toggle (default disabled)
-                const allowSignup = localStorage.getItem('auth_allow_signup_v1') === '1';
+                // Register toggle (defaults to allowed unless explicitly disabled).
+                const allowSignup = isSignupAllowed();
                 const registerBtn = document.getElementById('register-btn');
                 if (!allowSignup && registerBtn) {
                     registerBtn.style.display = 'none';
@@ -155,7 +164,8 @@ let supabase;
                 if (type === 'login') {
                     result = await supabase.auth.signInWithPassword({ email, password });
                 } else {
-                    result = await supabase.auth.signUp({ email, password });
+                    const redirect = `${window.location.origin}/login`;
+                    result = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirect } });
                 }
 
                 if (result.error) throw result.error;
@@ -247,7 +257,7 @@ let supabase;
         });
 
         document.getElementById('register-btn').addEventListener('click', () => {
-            if (localStorage.getItem('auth_allow_signup_v1') === '1') {
+            if (isSignupAllowed()) {
                 handleAuth('register');
             } else {
                 showAlert('Registration is disabled by the administrator.');

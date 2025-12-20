@@ -25,4 +25,5 @@ This app includes features that can become remote-code-execution (RCE) if expose
 ## Notes
 - Browser clients cannot set `Authorization` headers for WebSockets, so the terminal WebSocket uses a Supabase access token passed via a query param. Treat app access tokens as sensitive.
 - Rooms WebSocket uses the same token-in-query transport. Treat access tokens as sensitive and avoid logging them.
+- Admin user management endpoints require `SUPABASE_SERVICE_ROLE_KEY` on the server; never expose this key to the client.
 - If you add RAG indexing, crawling, or repository ingestion, apply the same auth + rate limiting + allowlisting patterns.

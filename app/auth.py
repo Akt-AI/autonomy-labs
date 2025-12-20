@@ -24,7 +24,7 @@ async def verify_supabase_access_token(access_token: str) -> dict[str, Any]:
         return cached[1]
 
     supabase_url = os.environ.get("SUPABASE_URL")
-    supabase_key = os.environ.get("SUPABASE_KEY")
+    supabase_key = os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
     if not supabase_url or not supabase_key:
         raise HTTPException(
             status_code=503,
