@@ -1474,6 +1474,7 @@ let supabase;
         async function startNewChat() {
             currentSessionId = null;
             chatHistory = [];
+            localStorage.removeItem('codex_thread_id_v1');
             document.getElementById('current-chat-title').textContent = "New Chat";
             document.getElementById('chat-history').innerHTML = '';
             document.getElementById('chat-input').value = '';
@@ -1703,6 +1704,21 @@ let supabase;
 
         function setCodexThreadId(id) {
             if (id) localStorage.setItem('codex_thread_id_v1', id);
+        }
+
+        function getAgentCodexThreadId() {
+            return localStorage.getItem('codex_agent_thread_id_v1') || '';
+        }
+
+        function setAgentCodexThreadId(id) {
+            if (id) localStorage.setItem('codex_agent_thread_id_v1', id);
+        }
+
+        function resetCodexThread() {
+            localStorage.removeItem('codex_thread_id_v1');
+            localStorage.removeItem('codex_agent_thread_id_v1');
+            const out = document.getElementById('codex-mcp-list');
+            if (out) out.textContent = 'Codex threads cleared.';
         }
 
         async function getCodexLoginStatus() {
@@ -1963,13 +1979,14 @@ let supabase;
                     if (!ok) throw new Error('Codex not authenticated');
                     const codex = getCodexSdkSettings();
                     const codexModel = (codex.model || '').trim();
+                    const existingThreadId = getAgentCodexThreadId() || null;
 
                     const res = await authFetch('/api/codex/cli/stream', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            message: agentChatHistory.map(m => (typeof m.content === 'string' ? m.content : '')).join('\n\n'),
-                            threadId: null,
+                            message,
+                            threadId: existingThreadId,
                             model: codexModel || null,
                             sandboxMode: 'workspace-write',
                             approvalPolicy: 'never',
@@ -1988,6 +2005,7 @@ let supabase;
                     const decoder = new TextDecoder();
                     let buffer = '';
                     let finalText = '';
+                    let threadId = existingThreadId;
                     const progress = [];
 
                     const pushProgress = (line) => {
@@ -2033,11 +2051,19 @@ let supabase;
                             let evt;
                             try { evt = JSON.parse(line); } catch { continue; }
                             pushProgress(summarizeEvent(evt));
+                            if (evt.type === 'thread.started' && evt.thread_id) {
+                                threadId = evt.thread_id;
+                                setAgentCodexThreadId(threadId);
+                            }
                             if (evt.type === 'item.updated' && evt.item?.type === 'agent_message' && evt.item?.text) {
                                 finalText = evt.item.text || finalText;
                             } else if (evt.type === 'item.completed' && evt.item?.type === 'agent_message') {
                                 finalText = evt.item.text || finalText;
                             } else if (evt.type === 'done') {
+                                if (evt.threadId) {
+                                    threadId = evt.threadId;
+                                    setAgentCodexThreadId(threadId);
+                                }
                                 if (evt.finalResponse) finalText = evt.finalResponse;
                             }
                             renderProgress();

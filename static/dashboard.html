@@ -289,8 +289,12 @@
                         <div class="pt-4 border-t border-gray-700">
                             <div class="flex items-center justify-between gap-2 mb-2">
                                 <div class="font-semibold text-gray-200">Codex SDK</div>
-                                <button onclick="refreshCodexMcpServers()"
-                                    class="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs">List MCP</button>
+                                <div class="flex gap-2">
+                                    <button onclick="resetCodexThread()"
+                                        class="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs">Reset Thread</button>
+                                    <button onclick="refreshCodexMcpServers()"
+                                        class="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs">List MCP</button>
+                                </div>
                             </div>
                             <div class="text-xs text-gray-400 mb-2">
                                 Uses OpenAI Codex SDK locally (separate from your chat provider settings). Device auth is available in the terminal: <code>codex login --device-auth</code>.
