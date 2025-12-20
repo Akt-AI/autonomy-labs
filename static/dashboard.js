@@ -327,23 +327,19 @@ let supabase;
 
         async function requireSupabaseLibrary() {
             if (window.supabase && typeof window.supabase.createClient === 'function') return;
-            try {
-                const url = configEndpoint('static/vendor/supabase-js.min.js');
-                const res = await fetch(url, { method: 'GET' });
-                if (!res.ok) {
-                    throw new Error(`Supabase JS bundle missing (${res.status}) at ${url}`);
-                }
-                const text = await res.text();
-                if (text.trimStart().startsWith('<')) {
-                    throw new Error(`Supabase JS bundle URL returned HTML (likely 404 page): ${url}`);
-                }
-            } catch (e) {
-                throw new Error(e?.message || String(e));
+            if (typeof window.__loadSupabase !== 'function') {
+                throw new Error('Supabase loader is missing (static/vendor/supabase-loader.js).');
             }
-            throw new Error('Supabase client library failed to load (bundle fetched but window.supabase is missing).');
+            await window.__loadSupabase();
         }
 
         function configEndpoint(path) {
+            const base = new URL('.', window.location.href);
+            const cleaned = String(path || '').replace(/^\/+/, '');
+            return new URL(cleaned, base).toString();
+        }
+
+        function routeUrl(path) {
             const base = new URL('.', window.location.href);
             const cleaned = String(path || '').replace(/^\/+/, '');
             return new URL(cleaned, base).toString();
@@ -1039,7 +1035,7 @@ let supabase;
                 window.__supabaseClient = supabase;
 
                 const { data: { session } } = await supabase.auth.getSession();
-                if (!session) { window.location.href = '/login'; return; }
+                if (!session) { window.location.href = routeUrl('login'); return; }
                 window.__sbAccessToken = (session.access_token || '').trim();
                 supabase.auth.onAuthStateChange((_event, nextSession) => {
                     window.__sbAccessToken = (nextSession?.access_token || '').trim();
@@ -1119,7 +1115,7 @@ let supabase;
 
                 document.getElementById('logout-btn').addEventListener('click', async () => {
                     await supabase.auth.signOut();
-                    window.location.href = '/login';
+                    window.location.href = routeUrl('login');
                 });
 
                 initProviderPresets();

@@ -69,21 +69,20 @@ var supabaseReady = false;
 
         async function requireSupabaseLibrary() {
             if (window.supabase && typeof window.supabase.createClient === 'function') return;
-            // Help debug the most common cause in Spaces: the bundle isn't being served.
-            try {
-                const url = configEndpoint('static/vendor/supabase-js.min.js');
-                const res = await fetch(url, { method: 'GET' });
-                if (!res.ok) {
-                    throw new Error(`Supabase JS bundle missing (${res.status}) at ${url}`);
-                }
-                const text = await res.text();
-                if (text.trimStart().startsWith('<')) {
-                    throw new Error(`Supabase JS bundle URL returned HTML (likely 404 page): ${url}`);
-                }
-            } catch (e) {
-                throw new Error(e?.message || String(e));
+            if (typeof window.__loadSupabase !== 'function') {
+                throw new Error('Supabase loader is missing (static/vendor/supabase-loader.js).');
             }
-            throw new Error('Supabase client library failed to load (bundle fetched but window.supabase is missing).');
+            await window.__loadSupabase();
+        }
+
+        function routeUrl(path) {
+            const base = new URL('.', window.location.href);
+            const cleaned = String(path || '').replace(/^\/+/, '');
+            return new URL(cleaned, base).toString();
+        }
+
+        function replaceUrl(path) {
+            try { window.location.replace(routeUrl(path)); } catch { window.location.href = routeUrl(path); }
         }
 
         function isRecoveryUrl() {
@@ -110,7 +109,11 @@ var supabaseReady = false;
                 const hasSession = !!data?.session;
                 if (hasSession) {
                     // Clean up URL to avoid leaking tokens via screenshots/logs/referrers.
-                    try { history.replaceState({}, '', '/login#type=recovery'); } catch { }
+                    try {
+                        const u = new URL(routeUrl('login'));
+                        u.hash = 'type=recovery';
+                        history.replaceState({}, '', u.pathname + u.search + u.hash);
+                    } catch { }
                 }
                 return { ok: hasSession, isRecovery: true, error: null };
             } catch (e) {
@@ -144,20 +147,24 @@ var supabaseReady = false;
                 supabase.auth.onAuthStateChange((event, session) => {
                     if (event === 'PASSWORD_RECOVERY') {
                         // Best-effort URL cleanup.
-                        try { history.replaceState({}, '', '/login#type=recovery'); } catch { }
+                        try {
+                            const u = new URL(routeUrl('login'));
+                            u.hash = 'type=recovery';
+                            history.replaceState({}, '', u.pathname + u.search + u.hash);
+                        } catch { }
                         showUpdatePanel();
                         return;
                     }
                     const recovery = isRecoveryUrl();
                     if (session && !recovery) {
-                        window.location.href = '/app';
+                        window.location.href = routeUrl('app');
                     }
                 });
 
                 const recovery = consumed.isRecovery || isRecoveryUrl();
                 const { data: { session } } = await supabase.auth.getSession();
                 if (session && !recovery) {
-                    window.location.href = '/app';
+                    window.location.href = routeUrl('app');
                     return;
                 }
                 if (recovery) {
@@ -248,12 +255,12 @@ var supabaseReady = false;
                 if (type === 'register') {
                     if (result.data && result.data.session) {
                         // Email verification is disabled, user is logged in
-                        window.location.href = '/app';
+                        window.location.href = routeUrl('app');
                     } else {
                         showAlert('Registration successful! Please check your email to verify (if enabled) or try logging in.', 'success');
                     }
                 } else {
-                    window.location.href = '/app';
+                    window.location.href = routeUrl('app');
                 }
             } catch (error) {
                 showAlert(error.message);
@@ -297,7 +304,7 @@ var supabaseReady = false;
 
         document.getElementById('cancel-update-btn').addEventListener('click', async () => {
             try { await supabase.auth.signOut(); } catch { }
-            window.location.replace('/login');
+            replaceUrl('login');
         });
 
         document.getElementById('update-password-btn').addEventListener('click', async () => {
@@ -325,7 +332,7 @@ var supabaseReady = false;
                 if (error) throw error;
                 showAlert('Password updated. You can log in now.', 'success');
                 try { await supabase.auth.signOut(); } catch { }
-                window.location.replace('/login');
+                replaceUrl('login');
             } catch (e) {
                 showAlert(e?.message || String(e));
             }
