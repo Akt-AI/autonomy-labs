@@ -32,57 +32,13 @@ class CodexRequest(BaseModel):
 
 @router.post("/api/codex")
 async def codex_agent(request: CodexRequest, http_request: Request):
-    if not request.message.strip():
-        raise HTTPException(status_code=400, detail="Message is required")
-    if not feature_enabled("codex"):
-        raise HTTPException(status_code=403, detail="Codex is disabled")
+    """
+    Backwards-compatible alias for Codex CLI execution.
 
-    user = await require_user_from_request(http_request)
-
-    node = os.environ.get("NODE_BIN", "node")
-    root = Path(__file__).resolve().parents[2]
-    script_path = root / "codex_agent.mjs"
-    if not script_path.exists():
-        raise HTTPException(status_code=500, detail="codex_agent.mjs not found")
-
-    payload = {
-        "message": request.message,
-        "threadId": request.threadId,
-        "model": request.model,
-        "sandboxMode": request.sandboxMode,
-        "approvalPolicy": request.approvalPolicy,
-        "modelReasoningEffort": request.modelReasoningEffort,
-        "workingDirectory": safe_user_workdir(user, request.workingDirectory),
-    }
-
-    try:
-        env = os.environ.copy()
-        env.setdefault("CODEX_PATH_OVERRIDE", "codex")
-        if request.apiKey:
-            env["CODEX_API_KEY"] = request.apiKey
-            env["OPENAI_API_KEY"] = request.apiKey
-        if request.apiKey and request.baseUrl:
-            env["OPENAI_BASE_URL"] = request.baseUrl
-
-        proc = await asyncio.create_subprocess_exec(
-            node,
-            str(script_path),
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env=env,
-        )
-        stdout, stderr = await proc.communicate(json.dumps(payload).encode("utf-8"))
-        if proc.returncode != 0:
-            err_text = (stderr.decode("utf-8", errors="ignore") or "").strip()
-            if "401 Unauthorized" in err_text or "status 401" in err_text:
-                raise HTTPException(status_code=401, detail=err_text or "Unauthorized")
-            raise HTTPException(status_code=500, detail=(err_text or "Codex agent failed"))
-        return json.loads(stdout.decode("utf-8"))
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    Historically this endpoint used the Node SDK wrapper, but CLI-first keeps auth consistent with
+    device-auth sessions and reduces SDK/CLI mismatch risk.
+    """
+    return await codex_agent_cli(request, http_request)
 
 
 def _with_codex_agent_prefix(message: str) -> str:
