@@ -84,27 +84,35 @@ ensure_codex_auth_from_env() {
   local dot_auth_path="${codex_home}/.auth.json"
 
   # Tokens should be provided as HF Spaces secrets / env vars at runtime.
-  # - CODEX_ID_TOKEN
-  # - CODEX_ACCESS_TOKEN
-  # - CODEX_REFRESH_TOKEN
+  # Supported env var names (prefer CODEX_*):
+  # - CODEX_ID_TOKEN / ID_TOKEN
+  # - CODEX_ACCESS_TOKEN / ACCESS_TOKEN
+  # - CODEX_REFRESH_TOKEN / REFRESH_TOKEN
   # Optional:
-  # - CODEX_ACCOUNT_ID (defaults to image ENV)
-  if [[ -z "${CODEX_ID_TOKEN:-}" ]] && [[ -z "${CODEX_ACCESS_TOKEN:-}" ]] && [[ -z "${CODEX_REFRESH_TOKEN:-}" ]]; then
+  # - CODEX_ACCOUNT_ID / ACCOUNT_ID
+  local id_token="${CODEX_ID_TOKEN:-${ID_TOKEN:-}}"
+  local access_token="${CODEX_ACCESS_TOKEN:-${ACCESS_TOKEN:-}}"
+  local refresh_token="${CODEX_REFRESH_TOKEN:-${REFRESH_TOKEN:-}}"
+  local account_id="${CODEX_ACCOUNT_ID:-${ACCOUNT_ID:-}}"
+
+  if [[ -z "${id_token}" ]] && [[ -z "${access_token}" ]] && [[ -z "${refresh_token}" ]]; then
     return 0
   fi
 
   mkdir -p "${codex_home}"
+  local last_refresh
+  last_refresh="$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || true)"
   local auth_json
   auth_json="$(cat <<EOF
 {
   "OPENAI_API_KEY": null,
   "tokens": {
-    "id_token": "${CODEX_ID_TOKEN:-}",
-    "access_token": "${CODEX_ACCESS_TOKEN:-}",
-    "refresh_token": "${CODEX_REFRESH_TOKEN:-}",
-    "account_id": "${CODEX_ACCOUNT_ID:-}"
+    "id_token": "${id_token}",
+    "access_token": "${access_token}",
+    "refresh_token": "${refresh_token}",
+    "account_id": "${account_id}"
   },
-  "last_refresh": null
+  "last_refresh": "${last_refresh}"
 }
 EOF
 )"

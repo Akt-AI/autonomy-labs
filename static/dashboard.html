@@ -1551,7 +1551,11 @@
                 if (btn) btn.classList.toggle('bg-gray-700', m === mode);
             });
 
-            if (mode === 'terminal' && activeTerminalId) setTimeout(() => fitTerm(activeTerminalId), 50);
+            if (mode === 'terminal') {
+                // Ensure panes are mounted/visible before fitting; hidden views report 0x0 and cause 1-col terminals.
+                applyTerminalLayout();
+                if (activeTerminalId) setTimeout(() => fitTerm(activeTerminalId), 50);
+            }
             if (mode === 'notes') setTimeout(() => { applyNotesLayout(); refreshNotesTree(); }, 0);
 
             document.getElementById('mobile-menu').classList.add('hidden');
@@ -1615,7 +1619,8 @@
             term.open(termDiv);
 
             const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/terminal`);
-            ws.onopen = () => { fitAddon.fit(); };
+            // Don't fit immediately here; terminals are often created while their view is hidden.
+            ws.onopen = () => { setTimeout(() => fitTerm(id), 0); };
             ws.onmessage = (event) => { term.write(event.data); };
             ws.onclose = () => { term.write('\r\n[disconnected]\r\n'); };
 
@@ -1808,16 +1813,29 @@
             setTimeout(() => visibleIds.forEach((tid) => fitTerm(tid)), 0);
         }
 
-        function fitTerm(id) {
-            if (terminals[id]) {
-                const { fitAddon, term, ws } = terminals[id];
-                try {
-                    fitAddon.fit();
-                    const cols = term.cols;
-                    const rows = term.rows;
-                    if (ws.readyState === WebSocket.OPEN) ws.send(`\x01resize:${cols}:${rows}`);
-                } catch (e) { console.log("Fit error:", e); }
+        function fitTerm(id, { retries = 10 } = {}) {
+            const t = terminals[id];
+            if (!t) return;
+            const { fitAddon, term, ws, containerId } = t;
+            const termDiv = document.getElementById(containerId);
+            if (!termDiv) return;
+
+            // If the terminal (or an ancestor view) is hidden, dimensions are 0 and FitAddon produces 1-col terminals.
+            const rect = termDiv.getBoundingClientRect();
+            const visible = termDiv.getClientRects().length > 0 && rect.width > 40 && rect.height > 40;
+            if (!visible) {
+                if (retries > 0) setTimeout(() => fitTerm(id, { retries: retries - 1 }), 60);
+                return;
             }
+
+            try {
+                fitAddon.fit();
+                const cols = term.cols;
+                const rows = term.rows;
+                if (cols >= 2 && rows >= 2 && ws.readyState === WebSocket.OPEN) {
+                    ws.send(`\x01resize:${cols}:${rows}`);
+                }
+            } catch (e) { console.log("Fit error:", e); }
         }
 
         function initAgentSplitPane() {

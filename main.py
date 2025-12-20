@@ -17,6 +17,7 @@ from openai import OpenAI
 import json
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 load_dotenv()
 
@@ -697,6 +698,38 @@ async def mcp_tools_call(request: McpCallRequest):
 @app.websocket("/ws/terminal")
 async def websocket_terminal(websocket: WebSocket):
     await websocket.accept()
+
+    # If token-based Codex auth is provided via env (HF Spaces Secrets), ensure the CLI auth file exists.
+    # This makes `codex` work inside the web terminal even if the entrypoint didn't run (e.g., local dev).
+    try:
+        id_token = os.environ.get("CODEX_ID_TOKEN") or os.environ.get("ID_TOKEN") or ""
+        access_token = os.environ.get("CODEX_ACCESS_TOKEN") or os.environ.get("ACCESS_TOKEN") or ""
+        refresh_token = os.environ.get("CODEX_REFRESH_TOKEN") or os.environ.get("REFRESH_TOKEN") or ""
+        account_id = os.environ.get("CODEX_ACCOUNT_ID") or os.environ.get("ACCOUNT_ID") or ""
+        if id_token or access_token or refresh_token:
+            codex_home = os.path.join(os.path.expanduser("~"), ".codex")
+            os.makedirs(codex_home, exist_ok=True)
+            auth = {
+                "OPENAI_API_KEY": None,
+                "tokens": {
+                    "id_token": id_token,
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                    "account_id": account_id,
+                },
+                "last_refresh": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            }
+            for filename in ("auth.json", ".auth.json"):
+                path = os.path.join(codex_home, filename)
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump(auth, f, indent=2)
+                    f.write("\n")
+                try:
+                    os.chmod(path, 0o600)
+                except Exception:
+                    pass
+    except Exception:
+        pass
     
     # Create PTY (required for an interactive shell). If the runtime has no PTY
     # devices (e.g., /dev/pts not mounted / exhausted), fail gracefully.
@@ -748,7 +781,11 @@ async def websocket_terminal(websocket: WebSocket):
                      # Format: ^Aresize:cols:rows
                      try:
                          _, cols, rows = data.split(':')
-                         winsize = struct.pack("HHHH", int(rows), int(cols), 0, 0)
+                         cols_i = int(cols)
+                         rows_i = int(rows)
+                         if cols_i < 2 or rows_i < 2:
+                             continue
+                         winsize = struct.pack("HHHH", rows_i, cols_i, 0, 0)
                          fcntl.ioctl(master_fd, termios.TIOCSWINSZ, winsize)
                      except:
                          pass
