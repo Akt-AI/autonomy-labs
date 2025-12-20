@@ -133,7 +133,7 @@ let supabase;
                     const cmd = codeEl.innerText.replace(/\n+$/, '');
                     if (!cmd) return;
                     const agentVisible = !document.getElementById('chat-view').classList.contains('hidden')
-                        && !document.getElementById('chat-autonomous').classList.contains('hidden');
+                        && !document.getElementById('agent-pane-terminal')?.classList.contains('hidden');
                     await runInTerminal(cmd + '\n', { preferScope: agentVisible ? 'agent' : 'main', autoShow: true });
                 };
 
@@ -345,6 +345,15 @@ let supabase;
             const base = new URL('.', window.location.href);
             const cleaned = String(path || '').replace(/^\/+/, '');
             return new URL(cleaned, base).toString();
+        }
+
+        function loginUrlWithNext(nextPath) {
+            const u = new URL(routeUrl('login'));
+            const next = String(nextPath || '').trim();
+            if (next && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\')) {
+                u.searchParams.set('next', next);
+            }
+            return u.toString();
         }
 
         async function fetchConfig() {
@@ -1037,7 +1046,7 @@ let supabase;
                 window.__supabaseClient = supabase;
 
                 const { data: { session } } = await supabase.auth.getSession();
-                if (!session) { window.location.href = routeUrl('login'); return; }
+                if (!session) { window.location.href = loginUrlWithNext(location.pathname || '/app'); return; }
                 window.__sbAccessToken = (session.access_token || '').trim();
                 supabase.auth.onAuthStateChange((_event, nextSession) => {
                     window.__sbAccessToken = (nextSession?.access_token || '').trim();
@@ -1610,6 +1619,7 @@ let supabase;
             const divider = document.getElementById('agent-split-divider');
             if (!root || !paneChat || !paneTerminal || !divider) return;
 
+            const alreadyInited = root.dataset.splitInited === '1';
             const key = 'agent_split_ratio_v1';
             const collapseKey = 'agent_terminal_collapsed_v1';
             const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
@@ -1634,6 +1644,9 @@ let supabase;
                 divider.classList.add('hidden');
                 paneChat.style.flex = '1 1 auto';
             }
+
+            if (alreadyInited) return;
+            root.dataset.splitInited = '1';
 
             let dragging = false;
             const onMove = (clientX) => {
@@ -1694,25 +1707,40 @@ let supabase;
         }
 
         function setChatMode(mode) {
-            const standard = document.getElementById('chat-standard');
-            const auto = document.getElementById('chat-autonomous');
+            const paneChat = document.getElementById('agent-pane-chat');
+            const paneTerminal = document.getElementById('agent-pane-terminal');
+            const divider = document.getElementById('agent-split-divider');
             const btnChat = document.getElementById('chat-mode-chat');
             const btnAuto = document.getElementById('chat-mode-auto');
-            if (!standard || !auto) return;
+            if (!paneChat || !paneTerminal || !divider) return;
             const m = mode === 'autonomous' ? 'autonomous' : 'chat';
 
-            standard.classList.toggle('hidden', m === 'autonomous');
-            auto.classList.toggle('hidden', m !== 'autonomous');
+            // Chat always stays visible; Autonomous mode just reveals the split terminal pane.
+            const collapsed = localStorage.getItem('agent_terminal_collapsed_v1') === '1';
+            const showTerminal = m === 'autonomous' && !collapsed;
+            paneTerminal.classList.toggle('hidden', !showTerminal);
+            divider.classList.toggle('hidden', !showTerminal);
+            const bar = document.getElementById('agent-terminal-collapsed-bar');
+            if (bar) bar.classList.toggle('hidden', showTerminal || m !== 'autonomous');
             if (btnChat) btnChat.classList.toggle('bg-white/10', m === 'chat');
             if (btnAuto) btnAuto.classList.toggle('bg-white/10', m === 'autonomous');
 
             localStorage.setItem('chat_mode_v1', m);
             if (m === 'autonomous') {
                 if (!activeAgentTerminalId) activeAgentTerminalId = createTerminalTab({ scope: 'agent' });
-                setTimeout(() => {
-                    initAgentSplitPane();
-                    if (activeAgentTerminalId) fitTerm(activeAgentTerminalId);
-                }, 0);
+                if (showTerminal) {
+                    setTimeout(() => {
+                        initAgentSplitPane();
+                        if (activeAgentTerminalId) fitTerm(activeAgentTerminalId);
+                    }, 0);
+                }
+                const input = document.getElementById('chat-input');
+                if (input) input.placeholder = 'Ask agent…';
+            }
+            if (m === 'chat') {
+                const input = document.getElementById('chat-input');
+                if (input) input.placeholder = 'Message...';
+                paneChat.style.flex = '1 1 auto';
             }
         }
 
@@ -1724,7 +1752,7 @@ let supabase;
 
         window.addEventListener('resize', () => {
             if (activeTerminalId && !document.getElementById('terminal-view').classList.contains('hidden')) fitTerm(activeTerminalId);
-            if (activeAgentTerminalId && !document.getElementById('chat-view').classList.contains('hidden') && !document.getElementById('chat-autonomous').classList.contains('hidden')) fitTerm(activeAgentTerminalId);
+            if (activeAgentTerminalId && !document.getElementById('chat-view').classList.contains('hidden') && !document.getElementById('agent-pane-terminal')?.classList.contains('hidden')) fitTerm(activeAgentTerminalId);
         });
 
         // --- Chat Logic ---

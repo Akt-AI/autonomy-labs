@@ -58,6 +58,11 @@ async def read_admin():
     return FileResponse(str(_STATIC / "dashboard.html"))
 
 
+@router.get("/docs")
+async def read_docs():
+    return FileResponse(str(_STATIC / "docs.html"))
+
+
 @router.get("/health")
 async def health_check():
     return {"status": "ok"}

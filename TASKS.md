@@ -67,7 +67,7 @@ Legend:
 - [x] Add lint/tests + CI (`ruff`, `pytest`, `.github/workflows/ci.yml`).
 
 ## P2/P3 — UI consolidation (nice-to-have)
-- [ ] Merge Autonomous mode and chat mode to a single chat UI.
+- [x] Merge Autonomous mode and chat mode to a single chat UI.
 
 ## P2 — Auth UX
 - [x] Password reset by email (Supabase recovery flow).

@@ -81,6 +81,26 @@ var supabaseReady = false;
             return new URL(cleaned, base).toString();
         }
 
+        function safeNextPath() {
+            try {
+                const nextRaw = String(new URLSearchParams(String(window.location.search || '')).get('next') || '').trim();
+                if (!nextRaw) return '';
+                if (!nextRaw.startsWith('/')) return '';
+                if (nextRaw.startsWith('//')) return '';
+                if (nextRaw.includes('\\')) return '';
+                // Only allow paths within the app.
+                return nextRaw;
+            } catch {
+                return '';
+            }
+        }
+
+        function postAuthRedirectUrl() {
+            const next = safeNextPath();
+            if (next) return routeUrl(next.replace(/^\/+/, ''));
+            return routeUrl('app');
+        }
+
         function replaceUrl(path) {
             try { window.location.replace(routeUrl(path)); } catch { window.location.href = routeUrl(path); }
         }
@@ -157,14 +177,14 @@ var supabaseReady = false;
                     }
                     const recovery = isRecoveryUrl();
                     if (session && !recovery) {
-                        window.location.href = routeUrl('app');
+                        window.location.href = postAuthRedirectUrl();
                     }
                 });
 
                 const recovery = consumed.isRecovery || isRecoveryUrl();
                 const { data: { session } } = await supabase.auth.getSession();
                 if (session && !recovery) {
-                    window.location.href = routeUrl('app');
+                    window.location.href = postAuthRedirectUrl();
                     return;
                 }
                 if (recovery) {
@@ -246,8 +266,10 @@ var supabaseReady = false;
                 if (type === 'login') {
                     result = await supabase.auth.signInWithPassword({ email, password });
                 } else {
-                    const redirect = `${window.location.origin}/login`;
-                    result = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirect } });
+                    const redirect = new URL(`${window.location.origin}/login`);
+                    const next = safeNextPath();
+                    if (next) redirect.searchParams.set('next', next);
+                    result = await supabase.auth.signUp({ email, password, options: { emailRedirectTo: redirect.toString() } });
                 }
 
                 if (result.error) throw result.error;
@@ -255,12 +277,12 @@ var supabaseReady = false;
                 if (type === 'register') {
                     if (result.data && result.data.session) {
                         // Email verification is disabled, user is logged in
-                        window.location.href = routeUrl('app');
+                        window.location.href = postAuthRedirectUrl();
                     } else {
                         showAlert('Registration successful! Please check your email to verify (if enabled) or try logging in.', 'success');
                     }
                 } else {
-                    window.location.href = routeUrl('app');
+                    window.location.href = postAuthRedirectUrl();
                 }
             } catch (error) {
                 showAlert(error.message);

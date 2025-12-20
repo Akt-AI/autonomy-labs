@@ -676,120 +676,49 @@
                     </div>
                 </div>
 
-                <div id="chat-standard" class="flex-grow flex flex-col min-h-0">
-                    <!-- Messages -->
-                    <div id="chat-history" class="flex-grow p-4 overflow-y-auto space-y-4 scroll-smooth">
-                        <div id="chat-empty-state" class="text-center text-gray-500 mt-10">
-                            <div class="text-lg font-semibold text-gray-300">Start a conversation</div>
-                            <div class="text-sm text-gray-500 mt-1">Pick a provider in Settings, then send a message.</div>
+                <div id="agent-split-root" class="split-root flex-grow min-h-0">
+                    <div id="agent-pane-chat" class="split-pane min-h-0 flex flex-col border-r border-gray-700 agent-pane-surface">
+                        <div id="agent-terminal-collapsed-bar" class="hidden px-3 py-2 border-b border-gray-700/70 flex items-center justify-end bg-gray-900/30">
+                            <button onclick="toggleAgentTerminalCollapsed()"
+                                class="px-2 py-1 text-xs rounded-md text-gray-200 hover:bg-white/10 transition"
+                                title="Show terminal">Show terminal</button>
                         </div>
-                    </div>
-
-                    <!-- Input -->
-                    <div class="p-3 bg-gray-800 border-t border-gray-700 shrink-0">
-                        <div id="chat-attachments" class="max-w-5xl mx-auto mb-2 hidden"></div>
-                        <div class="flex space-x-2 max-w-5xl mx-auto items-center">
-                            <select id="chat-agent-target" onchange="setChatAgentTarget(this.value)"
-                                class="bg-gray-700 h-10 rounded-lg border border-gray-600 px-2 text-sm text-white outline-none focus:border-blue-500"
-                                title="Target">
-                                <option value="chat">Chat</option>
-                                <option value="codex">@codex</option>
-                            </select>
-                            <textarea id="chat-input" rows="1"
-                                class="flex-grow bg-gray-700 px-3 py-2 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-32"
-                                placeholder="Message..."
-                                oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
-                                onkeydown="handleEnter(event)"></textarea>
-                            <input id="chat-model-quick" type="text" list="model-list" placeholder="Model"
-                                class="bg-gray-700 h-10 w-44 px-2 rounded-lg border border-gray-600 text-sm text-white outline-none focus:border-blue-500 hidden sm:block"
-                                onchange="setQuickModel(this.value)" title="Model" />
-                            <input id="chat-file-input" type="file" accept="image/*" multiple class="hidden" />
-                            <button onclick="document.getElementById('chat-file-input').click()"
-                                class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"
-                                title="Attach images" aria-label="Attach images">
-                                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21.44 11.05l-8.49 8.49a5 5 0 0 1-7.07-7.07l9.2-9.2a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.2a2 2 0 0 1-2.83-2.83l8.49-8.49" />
-                                </svg>
-                            </button>
-                            <button onclick="captureScreenshotToChat()"
-                                class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"
-                                title="Take screenshot" aria-label="Take screenshot">
-                                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7h4l2-2h4l2 2h4v12H4V7z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
-                                </svg>
-                            </button>
-                            <button id="chat-mic-btn" onclick="toggleChatDictation()"
-                                class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"
-                                title="Voice input" aria-label="Voice input">
-                                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 0 1-14 0" />
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19v3" />
-                                </svg>
-                            </button>
-                            <button id="chat-stop-btn" onclick="stopChatGeneration()" disabled
-                                class="bg-gray-600 h-10 px-3 rounded-lg hover:bg-gray-700 font-bold transition inline-flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
-                                title="Stop generating">
-                                <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
-                                    <rect x="7" y="7" width="10" height="10" rx="2" />
-                                </svg>
-                                Stop
-                            </button>
-                            <button onclick="sendChatBarMessage()"
-                                class="bg-blue-600 h-10 w-10 rounded-lg hover:bg-blue-700 font-bold transition inline-flex items-center justify-center">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Autonomous mode embedded in Chat view -->
-                <div id="chat-autonomous" class="hidden flex-grow min-h-0 flex flex-col">
-                    <div id="agent-split-root" class="split-root">
-                        <div id="agent-pane-chat" class="split-pane min-h-0 flex flex-col border-r border-gray-700 agent-pane-surface">
-                            <div id="agent-terminal-collapsed-bar" class="hidden px-3 py-2 border-b border-gray-700/70 flex items-center justify-end bg-gray-900/30">
-                                <button onclick="toggleAgentTerminalCollapsed()"
-                                    class="px-2 py-1 text-xs rounded-md text-gray-200 hover:bg-white/10 transition"
-                                    title="Show terminal">Show terminal</button>
-                            </div>
-                            <div class="flex-grow min-h-0 overflow-hidden">
-                                <div id="agent-chat-history" class="h-full p-4 overflow-y-auto space-y-4">
-                                    <div id="agent-empty-state" class="text-center text-gray-500 mt-10">
-                                        <div class="text-lg font-semibold text-gray-300">Autonomous mode</div>
-                                        <div class="text-sm text-gray-500 mt-1">Ask the agent, then use “Run” on code blocks.</div>
-                                    </div>
+                        <div id="chat-standard" class="flex-grow flex flex-col min-h-0">
+                            <!-- Messages -->
+                            <div id="chat-history" class="flex-grow p-4 overflow-y-auto space-y-4 scroll-smooth">
+                                <div id="chat-empty-state" class="text-center text-gray-500 mt-10">
+                                    <div class="text-lg font-semibold text-gray-300">Start a conversation</div>
+                                    <div class="text-sm text-gray-500 mt-1">Pick a provider in Settings, then send a message.</div>
                                 </div>
                             </div>
+
+                            <!-- Input -->
                             <div class="p-3 bg-gray-800 border-t border-gray-700 shrink-0">
-                                <div id="agent-attachments" class="mb-2 hidden"></div>
-                                <div class="flex space-x-2 items-center">
-                                    <select id="agent-agent-target" onchange="setAgentUseCodexCli(this.value === 'codex')"
+                                <div id="chat-attachments" class="max-w-5xl mx-auto mb-2 hidden"></div>
+                                <div class="flex space-x-2 max-w-5xl mx-auto items-center">
+                                    <select id="chat-agent-target" onchange="setChatAgentTarget(this.value)"
                                         class="bg-gray-700 h-10 rounded-lg border border-gray-600 px-2 text-sm text-white outline-none focus:border-blue-500"
                                         title="Target">
-                                        <option value="agent">Agent</option>
+                                        <option value="chat">Chat</option>
                                         <option value="codex">@codex</option>
                                     </select>
-                                    <textarea id="agent-chat-input" rows="1"
-                                        class="flex-grow bg-gray-700 px-3 py-2 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-28"
-                                        placeholder="Ask agent..."
+                                    <textarea id="chat-input" rows="1"
+                                        class="flex-grow bg-gray-700 px-3 py-2 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-32"
+                                        placeholder="Message..."
                                         oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
-                                        onkeydown="handleAgentEnter(event)"></textarea>
-                                    <input id="agent-model-quick" type="text" list="model-list" placeholder="Model"
+                                        onkeydown="handleEnter(event)"></textarea>
+                                    <input id="chat-model-quick" type="text" list="model-list" placeholder="Model"
                                         class="bg-gray-700 h-10 w-44 px-2 rounded-lg border border-gray-600 text-sm text-white outline-none focus:border-blue-500 hidden sm:block"
                                         onchange="setQuickModel(this.value)" title="Model" />
-                                    <input id="agent-file-input" type="file" accept="image/*" multiple class="hidden" />
-                                    <button onclick="document.getElementById('agent-file-input').click()"
+                                    <input id="chat-file-input" type="file" accept="image/*" multiple class="hidden" />
+                                    <button onclick="document.getElementById('chat-file-input').click()"
                                         class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"
                                         title="Attach images" aria-label="Attach images">
                                         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21.44 11.05l-8.49 8.49a5 5 0 0 1-7.07-7.07l9.2-9.2a3.5 3.5 0 0 1 4.95 4.95l-9.2 9.2a2 2 0 0 1-2.83-2.83l8.49-8.49" />
                                         </svg>
                                     </button>
-                                    <button onclick="captureScreenshotToAgent()"
+                                    <button onclick="captureScreenshotToChat()"
                                         class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"
                                         title="Take screenshot" aria-label="Take screenshot">
                                         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -797,7 +726,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
                                         </svg>
                                     </button>
-                                    <button id="agent-mic-btn" onclick="toggleAgentDictation()"
+                                    <button id="chat-mic-btn" onclick="toggleChatDictation()"
                                         class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"
                                         title="Voice input" aria-label="Voice input">
                                         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -806,17 +735,16 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19v3" />
                                         </svg>
                                     </button>
-                                    <button id="agent-stop-btn" onclick="stopAgentGeneration()" disabled
-                                        class="bg-gray-600 h-10 px-3 rounded-lg hover:bg-gray-700 font-bold transition flex items-center disabled:opacity-40 disabled:cursor-not-allowed"
+                                    <button id="chat-stop-btn" onclick="stopChatGeneration()" disabled
+                                        class="bg-gray-600 h-10 px-3 rounded-lg hover:bg-gray-700 font-bold transition inline-flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
                                         title="Stop generating">
                                         <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
                                             <rect x="7" y="7" width="10" height="10" rx="2" />
                                         </svg>
                                         Stop
                                     </button>
-                                    <button onclick="sendAgentMessage()"
-                                        class="bg-blue-600 h-10 w-10 rounded-lg hover:bg-blue-700 font-bold transition inline-flex items-center justify-center"
-                                        title="Send" aria-label="Send">
+                                    <button onclick="sendChatBarMessage()"
+                                        class="bg-blue-600 h-10 w-10 rounded-lg hover:bg-blue-700 font-bold transition inline-flex items-center justify-center">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
@@ -825,19 +753,19 @@
                                 </div>
                             </div>
                         </div>
-                        <div id="agent-split-divider" class="split-divider" title="Drag to resize panes"></div>
-                        <div id="agent-pane-terminal" class="split-pane min-h-0 agent-terminal-chrome flex flex-col">
-                            <div class="shrink-0 flex items-center bg-gray-900/60 border-b border-gray-700 overflow-x-auto">
-                                <div id="agent-terminal-tabs" class="flex"></div>
-                                <button onclick="toggleAgentTerminalCollapsed()"
-                                    class="ml-auto px-2 py-2 text-gray-300 hover:text-white hover:bg-white/10 transition font-bold"
-                                    title="Collapse terminal" aria-label="Collapse terminal">⟷</button>
-                                <button onclick="createTerminalTab({ scope: 'agent' })"
-                                    class="px-3 py-2 text-gray-300 hover:text-white hover:bg-white/10 transition font-bold"
-                                    title="New Terminal">+</button>
-                            </div>
-                            <div id="agent-terminals-container" class="flex-grow relative w-full h-full"></div>
+                    </div>
+                    <div id="agent-split-divider" class="split-divider hidden" title="Drag to resize panes"></div>
+                    <div id="agent-pane-terminal" class="split-pane hidden min-h-0 agent-terminal-chrome flex flex-col">
+                        <div class="shrink-0 flex items-center bg-gray-900/60 border-b border-gray-700 overflow-x-auto">
+                            <div id="agent-terminal-tabs" class="flex"></div>
+                            <button onclick="toggleAgentTerminalCollapsed()"
+                                class="ml-auto px-2 py-2 text-gray-300 hover:text-white hover:bg-white/10 transition font-bold"
+                                title="Collapse terminal" aria-label="Collapse terminal">⟷</button>
+                            <button onclick="createTerminalTab({ scope: 'agent' })"
+                                class="px-3 py-2 text-gray-300 hover:text-white hover:bg-white/10 transition font-bold"
+                                title="New Terminal">+</button>
                         </div>
+                        <div id="agent-terminals-container" class="flex-grow relative w-full h-full"></div>
                     </div>
                 </div>
             </div>
