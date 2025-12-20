@@ -766,12 +766,21 @@
                             </div>
                             <div class="p-3 bg-gray-800 border-t border-gray-700 shrink-0">
                                 <div id="agent-attachments" class="mb-2 hidden"></div>
-                                <div class="flex space-x-2 items-end">
+                                <div class="flex space-x-2 items-center">
+                                    <select id="agent-agent-target" onchange="setAgentUseCodexCli(this.value === 'codex')"
+                                        class="bg-gray-700 h-10 rounded-lg border border-gray-600 px-2 text-sm text-white outline-none focus:border-blue-500"
+                                        title="Target">
+                                        <option value="agent">Agent</option>
+                                        <option value="codex">@codex</option>
+                                    </select>
                                     <textarea id="agent-chat-input" rows="1"
                                         class="flex-grow bg-gray-700 px-3 py-2 rounded-lg border border-gray-600 resize-none focus:ring-2 focus:ring-blue-500 focus:outline-none text-white max-h-28"
                                         placeholder="Ask agent..."
                                         oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
                                         onkeydown="handleAgentEnter(event)"></textarea>
+                                    <input id="agent-model-quick" type="text" list="model-list" placeholder="Model"
+                                        class="bg-gray-700 h-10 w-44 px-2 rounded-lg border border-gray-600 text-sm text-white outline-none focus:border-blue-500 hidden sm:block"
+                                        onchange="setQuickModel(this.value)" title="Model" />
                                     <input id="agent-file-input" type="file" accept="image/*" multiple class="hidden" />
                                     <button onclick="document.getElementById('agent-file-input').click()"
                                         class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"
@@ -798,7 +807,7 @@
                                         </svg>
                                     </button>
                                     <button id="agent-stop-btn" onclick="stopAgentGeneration()" disabled
-                                        class="bg-gray-600 px-3 py-2 rounded-lg hover:bg-gray-700 font-bold transition flex items-center disabled:opacity-40 disabled:cursor-not-allowed"
+                                        class="bg-gray-600 h-10 px-3 rounded-lg hover:bg-gray-700 font-bold transition flex items-center disabled:opacity-40 disabled:cursor-not-allowed"
                                         title="Stop generating">
                                         <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
                                             <rect x="7" y="7" width="10" height="10" rx="2" />
@@ -806,7 +815,8 @@
                                         Stop
                                     </button>
                                     <button onclick="sendAgentMessage()"
-                                        class="bg-blue-600 px-4 py-2 rounded-lg hover:bg-blue-700 font-bold transition flex items-center">
+                                        class="bg-blue-600 h-10 w-10 rounded-lg hover:bg-blue-700 font-bold transition inline-flex items-center justify-center"
+                                        title="Send" aria-label="Send">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>

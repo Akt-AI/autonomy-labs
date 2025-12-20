@@ -323,6 +323,8 @@ let supabase;
             localStorage.setItem('agent_use_codex_cli_v1', enabled ? '1' : '0');
             const el = document.getElementById('agent-use-codex-cli');
             if (el) el.checked = !!enabled;
+            const sel = document.getElementById('agent-agent-target');
+            if (sel) sel.value = enabled ? 'codex' : 'agent';
         }
 
         async function requireSupabaseLibrary() {
@@ -2204,12 +2206,16 @@ let supabase;
             if (main) main.value = m;
             const quick = document.getElementById('chat-model-quick');
             if (quick) quick.value = m;
+            const agentQuick = document.getElementById('agent-model-quick');
+            if (agentQuick) agentQuick.value = m;
         }
 
         function syncQuickModelFromSettings() {
             const main = document.getElementById('chat-model');
             const quick = document.getElementById('chat-model-quick');
+            const agentQuick = document.getElementById('agent-model-quick');
             if (main && quick) quick.value = main.value || '';
+            if (main && agentQuick) agentQuick.value = main.value || '';
         }
 
         function getCodexThreadId() {
