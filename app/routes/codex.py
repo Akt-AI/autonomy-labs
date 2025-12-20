@@ -215,9 +215,33 @@ async def codex_agent_cli_stream(request: CodexRequest, http_request: Request):
 
                 async for b in emit(event):
                     yield b
+        except asyncio.CancelledError:
+            # Client disconnected (e.g. user pressed Stop). Ensure the subprocess doesn't keep running.
+            try:
+                proc.terminate()
+            except ProcessLookupError:
+                pass
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=3)
+            except Exception:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+                try:
+                    await proc.wait()
+                except Exception:
+                    pass
+            raise
         finally:
-            await proc.wait()
-            err_text = (await proc.stderr.read()).decode("utf-8", errors="ignore").strip()
+            try:
+                await proc.wait()
+            except Exception:
+                pass
+            try:
+                err_text = (await proc.stderr.read()).decode("utf-8", errors="ignore").strip()
+            except Exception:
+                err_text = ""
             if proc.returncode != 0 and err_text:
                 async for b in emit({"type": "stderr", "message": err_text, "returnCode": proc.returncode}):
                     yield b

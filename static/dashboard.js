@@ -2228,18 +2228,42 @@ let supabase;
         }
 
         async function importMcpConfigFromFile(file) {
+            if (!file) throw new Error('No file provided');
+            if (file.size > 1_000_000) throw new Error('mcp.json too large (max 1MB)');
             const text = await file.text();
-            const parsed = JSON.parse(text);
+            const parsed = JSON.parse(text || '{}');
+            if (parsed?.version != null && Number(parsed.version) !== 1) {
+                throw new Error('Unsupported mcp.json version');
+            }
             const servers = Array.isArray(parsed?.servers) ? parsed.servers : [];
-            const normalized = servers.map((s) => ({
-                id: s.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
-                name: s.name || s.id || 'mcp-server',
-                url: s.url || '',
-                apiKey: s?.auth?.apiKey || '',
-                token: s?.auth?.token || '',
-                headersJson: JSON.stringify(s.headers || {}, null, 2),
-                toolsJson: JSON.stringify(s.tools || [], null, 2)
-            })).filter((s) => s.url);
+            const normalized = servers
+                .filter((s) => s && typeof s === 'object')
+                .map((s) => {
+                    const rawUrl = String(s.url || '').trim();
+                    const urlOk = /^https?:\/\//i.test(rawUrl);
+                    const id = String(s.id || '').trim() || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+                    const name = String(s.name || s.id || 'mcp-server').trim().slice(0, 80);
+
+                    const auth = s.auth && typeof s.auth === 'object' ? s.auth : {};
+                    const apiKey = String(auth.apiKey || '').trim();
+                    const token = String(auth.token || '').trim();
+
+                    const headers = s.headers && typeof s.headers === 'object' && !Array.isArray(s.headers) ? s.headers : {};
+                    const toolsRaw = Array.isArray(s.tools) ? s.tools : [];
+                    const tools = toolsRaw.map((t) => String(t || '').trim()).filter(Boolean).slice(0, 200);
+
+                    return {
+                        id,
+                        name,
+                        url: urlOk ? rawUrl : '',
+                        apiKey,
+                        token,
+                        headersJson: JSON.stringify(headers, null, 2),
+                        toolsJson: JSON.stringify(tools, null, 2),
+                    };
+                })
+                .filter((s) => s.url);
+            if (!normalized.length) throw new Error('No valid servers found in mcp.json');
             saveMcpServers(normalized);
         }
 
@@ -2258,13 +2282,13 @@ let supabase;
             const statusEl = document.getElementById(statusElementId || `mcp-status-${id}`);
             const server = loadMcpServers().find(s => s.id === id);
             if (!server) return;
-            statusEl.textContent = 'Testing...';
+            if (statusEl) statusEl.textContent = 'Testing...';
 
             let extraHeaders = {};
             try {
                 extraHeaders = server.headersJson ? JSON.parse(server.headersJson) : {};
             } catch (e) {
-                statusEl.textContent = 'Invalid headers JSON';
+                if (statusEl) statusEl.textContent = 'Invalid headers JSON';
                 return;
             }
 
@@ -2276,9 +2300,9 @@ let supabase;
 
             try {
                 const res = await fetch(server.url, { method: 'GET', headers });
-                statusEl.textContent = `HTTP ${res.status}`;
+                if (statusEl) statusEl.textContent = `HTTP ${res.status}`;
             } catch (e) {
-                statusEl.textContent = `Error: ${e.message}`;
+                if (statusEl) statusEl.textContent = `Error: ${e.message}`;
             }
         }
 
@@ -2366,12 +2390,7 @@ let supabase;
             });
         }
 
-        // --- Provider & Models (Restored) ---
-        // (Assuming existing loadProviders/saveProvider/deleteProvider/fetchModels are preserved or need re-insertion if overwritten. 
-        //  The previous replacement block was huge, let's verify if they were cut off. 
-        //  Actually, the replacement block ended at `// ... [Include Chat/Provider JS here]`. 
-        //  So I must re-add them now.)
-
+        // --- Provider & Models ---
         async function fetchModels({ quiet = true } = {}) {
             const apiKey = document.getElementById('chat-api-key')?.value || '';
             const baseUrl = document.getElementById('chat-base-url')?.value || '';

@@ -31,6 +31,13 @@ Mitigations:
 - Switch to the Terminal view after the page fully loads.
 - Resize the browser window once to trigger a refit.
 
+## MCP “Test” fails even though the server is up
+
+The Settings → MCP “Test” button runs from your browser, so it is subject to CORS and network access from the client.
+
+Also note:
+- `mcp.json` import only accepts `http://` / `https://` URLs.
+
 ## PTY allocation failed
 
 If the backend prints `PTY allocation failed`, the runtime likely lacks `/dev/pts` or has exhausted PTYs.
