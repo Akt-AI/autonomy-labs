@@ -23,7 +23,7 @@ Legend:
 - [x] Landing + route split (`/` landing, `/login`, `/app`) and UI redirects updated.
 - [x] Split `static/dashboard.html` into JS/CSS files (`static/dashboard.js`, `static/dashboard.css`).
 - [x] Theme tokens shared across login + dashboard (single source of truth via `static/theme.css`).
-- [~] Separate Settings vs Admin dashboard (lightweight `/settings` and `/admin` entry pages; full dedicated pages pending).
+- [~] Separate Settings vs Admin dashboard (deep links + admin feature overrides done; full dedicated pages pending).
 
 ## P2 — Provider auth parity (Codex/Gemini/Claude)
 - [x] Codex auth file generation from env/secrets (`~/.codex/.auth.json` and `~/.codex/auth.json`).

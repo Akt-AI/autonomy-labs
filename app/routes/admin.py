@@ -8,7 +8,9 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app.auth import require_user_from_request
+from app.feature_overrides import load_feature_overrides, save_feature_overrides
 from app.routes.user import _is_admin
+from app.settings import feature_enabled
 
 router = APIRouter()
 
@@ -74,3 +76,37 @@ async def put_mcp_templates(body: McpTemplates, http_request: Request):
         return {"ok": True, "count": len(templates)}
     except Exception as e:
         raise HTTPException(status_code=500, detail={"code": "internal_error", "message": str(e)}) from e
+
+
+class FeatureOverridesBody(BaseModel):
+    overrides: dict[str, bool]
+
+
+@router.get("/api/admin/features")
+async def get_feature_overrides(http_request: Request):
+    user = await require_user_from_request(http_request)
+    _require_admin(user)
+    overrides = load_feature_overrides()
+    features = ["terminal", "codex", "mcp", "indexing", "rooms"]
+    return {
+        "ok": True,
+        "features": {
+            f: {"enabled": feature_enabled(f), "override": overrides.get(f)}
+            for f in features
+        },
+        "overrides": overrides,
+    }
+
+
+@router.put("/api/admin/features")
+async def put_feature_overrides(body: FeatureOverridesBody, http_request: Request):
+    user = await require_user_from_request(http_request)
+    _require_admin(user)
+    allowed = {"terminal", "codex", "mcp", "indexing", "rooms"}
+    overrides = {}
+    for k, v in (body.overrides or {}).items():
+        key = str(k).strip()
+        if key in allowed and isinstance(v, bool):
+            overrides[key] = v
+    saved = save_feature_overrides(overrides)
+    return {"ok": True, "overrides": saved}

@@ -69,6 +69,8 @@ HF Spaces generally supports PTYs, but custom runtimes may not.
 
 Set `ENABLE_ROOMS=1` in your environment and restart the container.
 
+Admins can also toggle feature overrides from Settings → Admin.
+
 ## P2P isn’t connecting in Rooms
 
 The Rooms view uses WebRTC DataChannels (optional, behind “Prefer P2P”). Some networks block UDP/WebRTC.

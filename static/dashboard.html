@@ -433,6 +433,43 @@
                             <div class="text-xs text-gray-400 mb-2">Read-only admin status and server feature flags.</div>
                             <div id="admin-status" class="text-sm text-gray-200">Loading...</div>
                             <div id="admin-features" class="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-300"></div>
+                            <div class="mt-3 bg-gray-900/30 border border-gray-700 rounded-lg p-3 space-y-2">
+                                <div class="flex items-center justify-between gap-2">
+                                    <div class="text-xs font-semibold text-gray-300 uppercase">Feature Overrides</div>
+                                    <div class="flex gap-2">
+                                        <button onclick="loadAdminFeatureOverrides()"
+                                            class="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs">Load</button>
+                                        <button onclick="saveAdminFeatureOverrides()"
+                                            class="bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded text-xs">Save</button>
+                                    </div>
+                                </div>
+                                <div class="text-xs text-gray-400">
+                                    Overrides are persisted server-side (requires admin). Useful for temporarily disabling high-risk features without a redeploy.
+                                </div>
+                                <div class="grid grid-cols-2 gap-2 text-xs text-gray-200">
+                                    <label class="flex items-center gap-2 bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2">
+                                        <input id="admin-override-terminal" type="checkbox" class="h-4 w-4 accent-blue-600">
+                                        Terminal
+                                    </label>
+                                    <label class="flex items-center gap-2 bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2">
+                                        <input id="admin-override-codex" type="checkbox" class="h-4 w-4 accent-blue-600">
+                                        Codex
+                                    </label>
+                                    <label class="flex items-center gap-2 bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2">
+                                        <input id="admin-override-mcp" type="checkbox" class="h-4 w-4 accent-blue-600">
+                                        MCP
+                                    </label>
+                                    <label class="flex items-center gap-2 bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2">
+                                        <input id="admin-override-indexing" type="checkbox" class="h-4 w-4 accent-blue-600">
+                                        Indexing
+                                    </label>
+                                    <label class="flex items-center gap-2 bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2">
+                                        <input id="admin-override-rooms" type="checkbox" class="h-4 w-4 accent-blue-600">
+                                        Rooms
+                                    </label>
+                                </div>
+                                <div id="admin-overrides-status" class="text-xs text-gray-500"></div>
+                            </div>
                             <div class="mt-3">
                                 <div class="text-xs font-semibold text-gray-400 mb-1 uppercase">MCP Templates (server)</div>
                                 <textarea id="admin-mcp-templates" rows="6"

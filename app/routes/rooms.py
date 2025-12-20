@@ -200,12 +200,14 @@ async def websocket_rooms(websocket: WebSocket):
                 text = _limit_text(str(msg.get("text") or ""))
                 if not text:
                     continue
+                client_id = str(msg.get("clientId") or "").strip()
+                if not client_id or len(client_id) > 120:
+                    client_id = str(uuid.uuid4())
                 chat_msg = {
                     "type": "chat.message",
-                    "id": str(uuid.uuid4()),
+                    "id": client_id,
                     "roomId": room_id,
                     "ts": _now_iso(),
-                    "fromUserId": user_id,
                     "fromDeviceId": device_id,
                     "text": text,
                 }
@@ -244,4 +246,3 @@ async def websocket_rooms(websocket: WebSocket):
             if not peers:
                 websocket.app.state.rooms_connections.pop(room_id, None)
         await _broadcast(websocket.app, room_id, {"type": "presence.leave", "roomId": room_id, "deviceId": device_id})
-

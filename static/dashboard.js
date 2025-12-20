@@ -197,7 +197,10 @@ let supabase;
             const admin = document.getElementById('admin-panel');
             if (admin) admin.scrollIntoView({ block: 'nearest' });
             // Best-effort auto-load templates for admins.
-            setTimeout(() => loadAdminMcpTemplates(), 0);
+            setTimeout(() => {
+                loadAdminFeatureOverrides();
+                loadAdminMcpTemplates();
+            }, 0);
         }
 
         function closeSettings() {
@@ -764,6 +767,72 @@ let supabase;
                 alert(`Saved templates (${data?.count ?? 0})`);
             } catch (e) {
                 alert(`Failed to save templates: ${e?.message || e}`);
+            }
+        }
+
+        function setAdminOverridesStatus(msg) {
+            const el = document.getElementById('admin-overrides-status');
+            if (el) el.textContent = msg || '';
+        }
+
+        function getAdminOverrideInputs() {
+            return {
+                terminal: document.getElementById('admin-override-terminal'),
+                codex: document.getElementById('admin-override-codex'),
+                mcp: document.getElementById('admin-override-mcp'),
+                indexing: document.getElementById('admin-override-indexing'),
+                rooms: document.getElementById('admin-override-rooms'),
+            };
+        }
+
+        async function loadAdminFeatureOverrides() {
+            const inputs = getAdminOverrideInputs();
+            if (!inputs.terminal) return;
+            try {
+                setAdminOverridesStatus('Loading…');
+                const res = await authFetch('/api/admin/features');
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                const overrides = data?.overrides || {};
+                for (const key of Object.keys(inputs)) {
+                    const el = inputs[key];
+                    if (!el) continue;
+                    if (Object.prototype.hasOwnProperty.call(overrides, key)) {
+                        el.checked = !!overrides[key];
+                    } else {
+                        // If no override is set, fall back to effective state as the default UI value.
+                        el.checked = !!data?.features?.[key]?.enabled;
+                    }
+                }
+                setAdminOverridesStatus('Loaded.');
+            } catch (e) {
+                const msg = String(e?.message || e);
+                if (msg.includes('403')) return;
+                setAdminOverridesStatus(`Load failed: ${msg}`);
+            }
+        }
+
+        async function saveAdminFeatureOverrides() {
+            const inputs = getAdminOverrideInputs();
+            if (!inputs.terminal) return;
+            const overrides = {};
+            for (const key of Object.keys(inputs)) {
+                const el = inputs[key];
+                if (!el) continue;
+                overrides[key] = !!el.checked;
+            }
+            try {
+                setAdminOverridesStatus('Saving…');
+                const res = await authFetch('/api/admin/features', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ overrides }),
+                });
+                if (!res.ok) throw new Error(await res.text());
+                await res.json();
+                setAdminOverridesStatus('Saved.');
+            } catch (e) {
+                setAdminOverridesStatus(`Save failed: ${e?.message || e}`);
             }
         }
 
@@ -3094,6 +3163,10 @@ let supabase;
         let roomsActiveRoomId = null;
         let roomsPeers = [];
         let roomsP2P = new Map(); // deviceId -> { pc, dc, polite, makingOffer, ignoreOffer }
+        let roomsMessageEls = new Map(); // messageId -> { el, statusEl }
+        let roomsReconnectAttempts = 0;
+        let roomsReconnectTimer = null;
+        let roomsWsClosing = false;
 
         function getDeviceId() {
             const key = 'device_id_v1';
@@ -3142,9 +3215,10 @@ let supabase;
             box.appendChild(div);
         }
 
-        function appendRoomMessage(msg) {
+        function appendRoomMessage(msg, { status = '' } = {}) {
             const box = document.getElementById('rooms-messages');
             if (!box) return;
+            const msgId = String(msg?.id || '').trim();
             const fromDevice = String(msg?.fromDeviceId || '').trim();
             const isMe = fromDevice && fromDevice === getDeviceId();
 
@@ -3156,15 +3230,22 @@ let supabase;
                 ? 'bg-blue-600/20 border-blue-500/30 text-gray-100'
                 : 'bg-gray-800/60 border-gray-700 text-gray-100'
                 }`;
+            if (msgId) bubble.dataset.messageId = msgId;
 
             const meta = document.createElement('div');
             meta.className = 'text-[11px] text-gray-400 mb-1 flex items-center justify-between gap-3';
             const who = document.createElement('span');
             who.textContent = isMe ? 'you' : (fromDevice ? fromDevice.slice(0, 8) : 'peer');
+            const right = document.createElement('span');
             const ts = document.createElement('span');
             ts.textContent = String(msg?.ts || '');
+            const st = document.createElement('span');
+            st.className = 'ml-2 text-gray-500';
+            st.textContent = status ? String(status) : '';
+            right.appendChild(ts);
+            right.appendChild(st);
             meta.appendChild(who);
-            meta.appendChild(ts);
+            meta.appendChild(right);
 
             const text = document.createElement('div');
             text.textContent = String(msg?.text || '');
@@ -3174,6 +3255,8 @@ let supabase;
             wrap.appendChild(bubble);
             box.appendChild(wrap);
             box.scrollTop = box.scrollHeight;
+            if (msgId) roomsMessageEls.set(msgId, { el: bubble, statusEl: st });
+            return bubble;
         }
 
         function renderRoomsList(rooms) {
@@ -3304,6 +3387,7 @@ let supabase;
 
         async function setActiveRoom(roomId, name) {
             roomsActiveRoomId = String(roomId || '').trim();
+            roomsMessageEls = new Map();
             updateRoomsHeader(roomsActiveRoomId, name || 'Room');
             renderRoomsMessagesEmpty('Loading…');
             await loadRoomsList();
@@ -3333,11 +3417,30 @@ let supabase;
         }
 
         function disconnectRoomsWs() {
+            roomsWsClosing = true;
             if (roomsWs) {
                 try { roomsWs.close(); } catch { }
                 roomsWs = null;
             }
+            if (roomsReconnectTimer) {
+                clearTimeout(roomsReconnectTimer);
+                roomsReconnectTimer = null;
+            }
             setRoomsConnStatus('Disconnected');
+            setTimeout(() => { roomsWsClosing = false; }, 250);
+        }
+
+        function scheduleRoomsReconnect() {
+            if (roomsReconnectTimer) return;
+            if (!roomsActiveRoomId) return;
+            roomsReconnectAttempts += 1;
+            if (roomsReconnectAttempts > 5) return;
+            const delay = Math.min(8000, 600 * roomsReconnectAttempts);
+            roomsReconnectTimer = setTimeout(() => {
+                roomsReconnectTimer = null;
+                connectRoomsWs().catch(() => { });
+            }, delay);
+            setRoomsConnStatus(`Reconnecting… (${roomsReconnectAttempts})`);
         }
 
         async function connectRoomsWs() {
@@ -3359,12 +3462,14 @@ let supabase;
             setRoomsConnStatus('Connecting…');
 
             roomsWs.onopen = () => {
+                roomsReconnectAttempts = 0;
                 setRoomsConnStatus('WS connected');
                 maybeStartRoomP2p();
             };
             roomsWs.onclose = () => {
                 setRoomsConnStatus('Disconnected');
                 closeAllRoomP2p();
+                if (!roomsWsClosing) scheduleRoomsReconnect();
             };
             roomsWs.onmessage = (event) => {
                 let msg;
@@ -3392,6 +3497,14 @@ let supabase;
                     return;
                 }
                 if (t === 'chat.message') {
+                    const msgId = String(msg?.id || '').trim();
+                    const fromDevice = String(msg?.fromDeviceId || '').trim();
+                    const isMe = fromDevice && fromDevice === getDeviceId();
+                    if (msgId && isMe && roomsMessageEls.has(msgId)) {
+                        const entry = roomsMessageEls.get(msgId);
+                        if (entry?.statusEl) entry.statusEl.textContent = 'delivered';
+                        return;
+                    }
                     appendRoomMessage(msg);
                     return;
                 }
@@ -3418,20 +3531,23 @@ let supabase;
                 const sent = sendRoomMessageViaP2p(text);
                 if (sent) return;
             }
-            sendRoomsWs({ type: 'chat.send', text });
+            const clientId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())) + '-' + Math.random().toString(16).slice(2);
+            appendRoomMessage({ id: clientId, text, ts: new Date().toISOString(), fromDeviceId: getDeviceId() }, { status: 'sending' });
+            sendRoomsWs({ type: 'chat.send', text, clientId });
         }
 
         function sendRoomMessageViaP2p(text) {
+            const clientId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())) + '-' + Math.random().toString(16).slice(2);
             let any = false;
             for (const entry of roomsP2P.values()) {
                 if (!entry?.dc || entry.dc.readyState !== 'open') continue;
                 try {
-                    entry.dc.send(JSON.stringify({ type: 'chat.message', text, ts: new Date().toISOString() }));
+                    entry.dc.send(JSON.stringify({ type: 'chat.message', id: clientId, text, ts: new Date().toISOString() }));
                     any = true;
                 } catch { }
             }
             if (any) {
-                appendRoomMessage({ text, ts: new Date().toISOString(), fromDeviceId: getDeviceId() });
+                appendRoomMessage({ id: clientId, text, ts: new Date().toISOString(), fromDeviceId: getDeviceId() }, { status: 'p2p' });
             }
             return any;
         }
@@ -3514,7 +3630,7 @@ let supabase;
                 let msg;
                 try { msg = JSON.parse(e.data); } catch { return; }
                 if (msg?.type === 'chat.message') {
-                    appendRoomMessage({ text: msg.text, ts: msg.ts, fromDeviceId: peerId });
+                    appendRoomMessage({ id: msg.id, text: msg.text, ts: msg.ts, fromDeviceId: peerId });
                 }
             };
             dc.onclose = () => {
