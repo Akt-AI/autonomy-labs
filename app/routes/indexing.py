@@ -17,6 +17,15 @@ class WebCrawlRequest(BaseModel):
     respectRobots: bool = True
 
 
+class GitHubRepoRequest(BaseModel):
+    repo: str  # owner/name or https://github.com/owner/name
+    ref: str | None = None  # branch, tag, or sha
+    pathPrefix: str | None = None  # optional subdirectory
+    maxFiles: int = 60
+    maxFileBytes: int = 200_000
+    maxTotalBytes: int = 2_000_000
+
+
 @router.get("/api/indexing/jobs")
 async def list_indexing_jobs(http_request: Request):
     if not feature_enabled("indexing"):
@@ -48,6 +57,25 @@ async def start_web_crawl(body: WebCrawlRequest, http_request: Request):
     return {"ok": True, "job": job.__dict__}
 
 
+@router.post("/api/indexing/jobs/github-repo")
+async def start_github_repo(body: GitHubRepoRequest, http_request: Request):
+    if not feature_enabled("indexing"):
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Indexing is disabled"})
+    user = await require_user_from_request(http_request)
+    user_id = str(user.get("id") or "")
+    store = http_request.app.state.index_job_store
+    job = await store.create_github_repo_job(
+        user_id,
+        repo=body.repo,
+        ref=body.ref,
+        path_prefix=body.pathPrefix,
+        max_files=body.maxFiles,
+        max_file_bytes=body.maxFileBytes,
+        max_total_bytes=body.maxTotalBytes,
+    )
+    return {"ok": True, "job": job.__dict__}
+
+
 @router.post("/api/indexing/jobs/{job_id}/cancel")
 async def cancel_job(job_id: str, http_request: Request):
     if not feature_enabled("indexing"):
@@ -57,4 +85,3 @@ async def cancel_job(job_id: str, http_request: Request):
     store = http_request.app.state.index_job_store
     ok = await store.cancel_job(user_id, job_id)
     return {"ok": True, "canceled": ok}
-

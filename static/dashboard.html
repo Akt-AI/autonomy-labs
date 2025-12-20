@@ -521,6 +521,34 @@
                                     <div id="indexing-status" class="text-xs text-gray-500"></div>
                                     <div id="indexing-jobs" class="space-y-2"></div>
                                 </div>
+                                <div class="bg-gray-900/30 border border-gray-700 rounded-lg p-3 space-y-2">
+                                    <div class="text-xs font-semibold text-gray-300 uppercase">GitHub Repo Indexing</div>
+                                    <div class="text-xs text-gray-400">Indexes repository text files into RAG (uses `GITHUB_TOKEN`/`GITHUB_PAT` for private repos).</div>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                        <input id="gh-repo" type="text" placeholder="owner/repo or https://github.com/owner/repo"
+                                            class="md:col-span-2 bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500">
+                                        <button onclick="startGithubRepoJob()"
+                                            class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded text-xs">Start</button>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Ref</label>
+                                            <input id="gh-ref" type="text" placeholder="main"
+                                                class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Path Prefix</label>
+                                            <input id="gh-path" type="text" placeholder="(optional) src/"
+                                                class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Max Files</label>
+                                            <input id="gh-max-files" type="number" min="1" max="400" value="60"
+                                                class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500">
+                                        </div>
+                                    </div>
+                                    <div id="github-indexing-status" class="text-xs text-gray-500"></div>
+                                </div>
                                 <div>
                                     <div class="text-xs font-semibold text-gray-400 mb-1 uppercase">Documents</div>
                                     <div id="rag-documents" class="space-y-2"></div>

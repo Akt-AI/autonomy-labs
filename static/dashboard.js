@@ -374,6 +374,11 @@ let supabase;
             if (el) el.textContent = text || '';
         }
 
+        function setGithubIndexingStatus(text) {
+            const el = document.getElementById('github-indexing-status');
+            if (el) el.textContent = text || '';
+        }
+
         function renderIndexingJobs(jobs) {
             const el = document.getElementById('indexing-jobs');
             if (!el) return;
@@ -401,7 +406,22 @@ let supabase;
                 const p = j?.progress || {};
                 const visited = p?.visited ?? 0;
                 const indexed = p?.indexedPages ?? 0;
-                meta.textContent = `${j?.createdAt || ''} • visited ${visited} • indexed ${indexed}`;
+                const params = j?.params || {};
+                const detail = (() => {
+                    if (j?.type === 'web_crawl') return params?.startUrl || '';
+                    if (j?.type === 'github_repo') {
+                        const ref = params?.ref ? `@${params.ref}` : '';
+                        const pref = params?.pathPrefix ? ` • ${params.pathPrefix}` : '';
+                        return `${params?.owner || ''}/${params?.repo || ''}${ref}${pref}`.trim();
+                    }
+                    return '';
+                })();
+                const indexedFiles = p?.indexedFiles ?? 0;
+                const bytes = p?.bytes ?? 0;
+                const progressBits = j?.type === 'github_repo'
+                    ? `files ${indexedFiles} • ${Math.round(bytes / 1024)} KB`
+                    : `visited ${visited} • indexed ${indexed}`;
+                meta.textContent = `${j?.createdAt || ''}${detail ? ' • ' + detail : ''} • ${progressBits}`;
                 left.appendChild(title);
                 left.appendChild(meta);
 
@@ -457,6 +477,31 @@ let supabase;
                 loadIndexingJobs();
             } catch (e) {
                 setIndexingStatus(`Failed to start job: ${e?.message || e}`);
+            }
+        }
+
+        async function startGithubRepoJob() {
+            const repo = (document.getElementById('gh-repo')?.value || '').trim();
+            const ref = (document.getElementById('gh-ref')?.value || '').trim() || null;
+            const pathPrefix = (document.getElementById('gh-path')?.value || '').trim() || null;
+            const maxFiles = Number(document.getElementById('gh-max-files')?.value || 60);
+            if (!repo) {
+                setGithubIndexingStatus('Enter a repo (owner/repo).');
+                return;
+            }
+            try {
+                setGithubIndexingStatus('Starting job...');
+                const res = await authFetch('/api/indexing/jobs/github-repo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ repo, ref, pathPrefix, maxFiles }),
+                });
+                if (!res.ok) throw new Error(await res.text());
+                await res.json();
+                setGithubIndexingStatus('Job started.');
+                loadIndexingJobs();
+            } catch (e) {
+                setGithubIndexingStatus(`Failed to start job: ${e?.message || e}`);
             }
         }
 
@@ -2521,8 +2566,16 @@ let supabase;
             if (server.token) headers['Authorization'] = `Bearer ${server.token}`;
 
             try {
-                const res = await fetch(server.url, { method: 'GET', headers });
-                if (statusEl) statusEl.textContent = `HTTP ${res.status}`;
+                const res = await authFetch('/api/mcp/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: server.url, headers, timeoutSec: 3.0 }),
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                const code = data?.statusCode ?? '—';
+                const ctype = data?.contentType ? ` • ${data.contentType}` : '';
+                if (statusEl) statusEl.textContent = `HTTP ${code}${ctype}`;
             } catch (e) {
                 if (statusEl) statusEl.textContent = `Error: ${e.message}`;
             }

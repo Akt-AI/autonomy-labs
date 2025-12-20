@@ -34,6 +34,10 @@ Set `ENABLE_INDEXING=1` in your environment and restart the container.
 Website indexing blocks private/localhost targets to reduce SSRF risk.
 Use a public `http(s)` URL and keep indexing within the same origin.
 
+## GitHub indexing fails for private repos
+
+Set `GITHUB_TOKEN` (or `GITHUB_PAT`) as an environment variable / HF Secret, then retry.
+
 ## Terminal shows vertical/1-column text
 
 This usually means the terminal “fit” ran while the terminal view was hidden or at size 0.

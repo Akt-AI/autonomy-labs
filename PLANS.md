@@ -3,6 +3,7 @@
 This file is the repo-level roadmap for `autonomy-labs`. It’s intentionally opinionated and ordered by risk reduction first, then maintainability, then feature expansion.
 
 ## P0 — Security + correctness (blockers)
+
 - Gate **all dangerous endpoints** server-side (not just UI):
   - `/ws/terminal`
   - `/api/codex*`
@@ -14,6 +15,7 @@ This file is the repo-level roadmap for `autonomy-labs`. It’s intentionally op
 - Add `SECURITY.md` with threat model + safe deployment guidance.
 
 ## P1 — Backend refactor + lifecycle
+
 - Split `main.py` into routers/services:
   - `app/auth.py`, `app/chat.py`, `app/terminal.py`, `app/codex.py`, `app/mcp.py`, `app/settings.py`, `app/admin.py`, `app/indexing.py`
 - Add FastAPI lifespan management:
@@ -23,6 +25,7 @@ This file is the repo-level roadmap for `autonomy-labs`. It’s intentionally op
 - Standardize API error schema (UI should not parse strings to detect failure modes).
 
 ## P2 — UI/UX, settings, admin, landing
+
 - Split `static/dashboard.html` into modules:
   - `static/dashboard.js`, `static/terminal.js`, `static/agent.js`, `static/settings.js`, `static/admin.js`, `static/mcp.js`, `static/rag.js`
   - `static/theme.css`
@@ -38,6 +41,7 @@ This file is the repo-level roadmap for `autonomy-labs`. It’s intentionally op
   - keep `/login` and `/app` as dedicated routes (or similar)
 
 ## P2 — Provider auth parity (Codex/Gemini/Claude)
+
 - Keep provider auth out of git; source from env/HF Secrets.
 - Support “Codex-like” auth file generation when a CLI requires it:
   - Codex: `~/.codex/.auth.json` and `~/.codex/auth.json` from `CODEX_*` (or fallback envs).
@@ -46,21 +50,25 @@ This file is the repo-level roadmap for `autonomy-labs`. It’s intentionally op
   - `SSH_PRIVATE_KEY` (+ optional `SSH_PUBLIC_KEY`, `SSH_KNOWN_HOSTS`)
 
 ## P2 — Codex workspace directory (UI)
+
 - Add a per-user “workspace directory” setting.
 - Enforce an allowlisted root (e.g. `/data/codex/workspace/<user>`), prevent traversal, ensure it exists.
 
 ## P2 — Stream Codex events in Agent mode
+
 - Use `/api/codex/cli/stream` for agent execution.
 - UI: render streaming events progressively (agent text, tool events, final summary + usage).
 - Add stop/reconnect handling.
 
 ## P2/P3 — MCP registry
+
 - Add a first-class MCP registry:
   - per-user servers + optional global templates
   - “test connection”, “list tools”, allow/deny tool lists
   - import/export `mcp.json`
 
 ## P3 — RAG + indexing (docs/web/GitHub) + “password manager”
+
 - Clarify “password manager” scope:
   - secure vault for secrets (high-risk; encryption + audit required), or
   - indexed notes (lower-risk but still private)
@@ -73,6 +81,7 @@ This file is the repo-level roadmap for `autonomy-labs`. It’s intentionally op
 Note: see `docs/PASSWORD_MANAGER_SCOPE.md` for the current (non-vault) stance and recommended path forward.
 
 ## P3 — P2P pubsub chat + account manager
+
 - Implement account manager concepts:
   - identities/devices, room/topic membership, permissions, moderation tools
 - Transport:
@@ -82,7 +91,12 @@ Note: see `docs/PASSWORD_MANAGER_SCOPE.md` for the current (non-vault) stance an
   - rooms, presence, delivery status, network mode indicators
 
 ## Engineering hygiene (ongoing)
+
 - Add `.env.example`, `docs/TROUBLESHOOTING.md`, `docs/ARCHITECTURE.md`, `docs/SECURITY_DEPLOYMENT.md`
 - Add lint/tests + CI:
   - Python: `ruff`, `pytest`
   - basic security smoke tests for endpoint gating
+
+## Feature suggestions (By User)
+
+- Support GitHub token auth via HF Secrets (`GITHUB_TOKEN`/`GITHUB_PAT`) and document it in `.env.example`.

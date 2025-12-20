@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
-import socket
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -15,6 +15,7 @@ from urllib.parse import urljoin, urlparse
 import httpx
 from fastapi import HTTPException
 
+from app.net_safety import is_public_host, validate_public_http_url
 from app.storage import user_data_dir
 
 
@@ -26,54 +27,8 @@ def _now_iso() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _is_public_host(hostname: str) -> bool:
-    host = (hostname or "").strip().lower()
-    if not host:
-        return False
-    if host in {"localhost", "localhost.localdomain"}:
-        return False
-    if host.endswith(".local") or host.endswith(".internal"):
-        return False
-
-    try:
-        infos = socket.getaddrinfo(host, None, proto=socket.IPPROTO_TCP)
-    except Exception:
-        return False
-
-    import ipaddress
-
-    for info in infos:
-        addr = info[4][0]
-        try:
-            ip = ipaddress.ip_address(addr)
-        except Exception:
-            return False
-        if (
-            ip.is_private
-            or ip.is_loopback
-            or ip.is_link_local
-            or ip.is_multicast
-            or ip.is_reserved
-            or ip.is_unspecified
-        ):
-            return False
-    return True
-
-
 def _normalize_url(url: str) -> str:
-    u = (url or "").strip()
-    if not u:
-        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "Missing URL"})
-    p = urlparse(u)
-    if p.scheme not in {"https", "http"}:
-        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "URL must be http(s)"})
-    if not p.netloc:
-        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "URL must include a host"})
-    if not _is_public_host(p.hostname or ""):
-        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "Host is not allowed"})
-    # Normalize: strip fragment, keep query.
-    normalized = p._replace(fragment="").geturl()
-    return normalized
+    return validate_public_http_url(url)
 
 
 def _extract_links(html: str) -> list[str]:
@@ -172,6 +127,68 @@ def add_rag_document(user_id: str, *, name: str, text: str, source: str | None =
     docs.append(entry)
     _save_rag_index(idx_path, idx)
     return {"id": doc_id, "chunks": len(chunks)}
+
+
+def _parse_github_repo(repo: str) -> tuple[str, str]:
+    raw = (repo or "").strip()
+    if not raw:
+        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "Missing repo"})
+
+    if raw.startswith(("https://", "http://")):
+        p = urlparse(raw)
+        host = (p.hostname or "").lower()
+        if host != "github.com":
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "invalid_request", "message": "Repo host must be github.com"},
+            )
+        parts = [x for x in (p.path or "").split("/") if x]
+        if len(parts) < 2:
+            raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "Invalid repo URL"})
+        owner, name = parts[0], parts[1]
+    else:
+        if "/" not in raw:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "invalid_request", "message": "Repo must be owner/name"},
+            )
+        owner, name = raw.split("/", 1)
+
+    owner = owner.strip()
+    name = name.strip()
+    if name.endswith(".git"):
+        name = name[:-4]
+
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,100}", owner or ""):
+        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "Invalid owner"})
+    if not re.fullmatch(r"[A-Za-z0-9_.-]{1,100}", name or ""):
+        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "Invalid repo name"})
+    return owner, name
+
+
+def _github_headers() -> dict[str, str]:
+    token = (os.environ.get("GITHUB_TOKEN") or os.environ.get("GITHUB_PAT") or "").strip()
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "autonomy-labs/1.0",
+    }
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def _looks_binary(data: bytes) -> bool:
+    if not data:
+        return False
+    if b"\x00" in data[:4096]:
+        return True
+    return False
+
+
+_GITHUB_TEXT_FILE_RE = re.compile(
+    r"\.(md|markdown|txt|rst|py|js|ts|jsx|tsx|json|yaml|yml|toml|go|rs|java|kt|c|cc|cpp|h|hpp|sh)$",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -282,6 +299,43 @@ class IndexJobStore:
         self._task_map(user_id)[job.id] = task
         return job
 
+    async def create_github_repo_job(
+        self,
+        user_id: str,
+        *,
+        repo: str,
+        ref: str | None = None,
+        path_prefix: str | None = None,
+        max_files: int = 60,
+        max_file_bytes: int = 200_000,
+        max_total_bytes: int = 2_000_000,
+    ) -> IndexJob:
+        owner, name = _parse_github_repo(repo)
+        ref_s = (ref or "").strip() or None
+        prefix = (path_prefix or "").strip().lstrip("/")
+        max_files = max(1, min(int(max_files), 400))
+        max_file_bytes = max(1_000, min(int(max_file_bytes), 1_000_000))
+        max_total_bytes = max(10_000, min(int(max_total_bytes), 15_000_000))
+
+        job = IndexJob(
+            id=str(uuid.uuid4()),
+            type="github_repo",
+            createdAt=_now_iso(),
+            params={
+                "owner": owner,
+                "repo": name,
+                "ref": ref_s,
+                "pathPrefix": prefix,
+                "maxFiles": max_files,
+                "maxFileBytes": max_file_bytes,
+                "maxTotalBytes": max_total_bytes,
+            },
+        )
+        await self._update_job(user_id, job)
+        task = asyncio.create_task(self._run_github_repo(user_id, job))
+        self._task_map(user_id)[job.id] = task
+        return job
+
     async def _run_web_crawl(self, user_id: str, job: IndexJob) -> None:
         job.status = "running"
         job.progress = {"visited": 0, "indexedPages": 0, "queued": 0}
@@ -300,7 +354,11 @@ class IndexJobStore:
         robots_disallow_all = False
         if respect_robots:
             try:
-                async with httpx.AsyncClient(timeout=10.0, follow_redirects=False, headers={"User-Agent": "autonomy-labs/1.0"}) as c:
+                async with httpx.AsyncClient(
+                    timeout=10.0,
+                    follow_redirects=False,
+                    headers={"User-Agent": "autonomy-labs/1.0"},
+                ) as c:
                     r = await c.get(f"{base}/robots.txt")
                 if r.status_code == 200:
                     txt = (r.text or "")
@@ -331,7 +389,11 @@ class IndexJobStore:
         visited: set[str] = set()
         pages: list[tuple[str, str]] = []
 
-        async with httpx.AsyncClient(timeout=15.0, follow_redirects=False, headers={"User-Agent": "autonomy-labs/1.0"}) as client:
+        async with httpx.AsyncClient(
+            timeout=15.0,
+            follow_redirects=False,
+            headers={"User-Agent": "autonomy-labs/1.0"},
+        ) as client:
             try:
                 while queue and len(visited) < max_pages:
                     url, depth = queue.pop(0)
@@ -346,7 +408,7 @@ class IndexJobStore:
                         continue
                     if parsed.netloc != allowed_netloc:
                         continue
-                    if not _is_public_host(parsed.hostname or ""):
+                    if not is_public_host(parsed.hostname or ""):
                         continue
 
                     resp = await client.get(url)
@@ -415,4 +477,171 @@ class IndexJobStore:
         job.status = "succeeded"
         job.result = {"pages": len(pages), "ragDoc": result}
         job.progress = {"visited": len(visited), "indexedPages": len(pages), "queued": 0}
+        await self._update_job(user_id, job)
+
+    async def _run_github_repo(self, user_id: str, job: IndexJob) -> None:
+        job.status = "running"
+        job.progress = {"files": 0, "indexedFiles": 0, "bytes": 0}
+        await self._update_job(user_id, job)
+
+        owner = str(job.params.get("owner") or "")
+        repo = str(job.params.get("repo") or "")
+        ref = (job.params.get("ref") or "").strip() or None
+        prefix = (job.params.get("pathPrefix") or "").strip().lstrip("/")
+        max_files = int(job.params.get("maxFiles") or 60)
+        max_file_bytes = int(job.params.get("maxFileBytes") or 200_000)
+        max_total_bytes = int(job.params.get("maxTotalBytes") or 2_000_000)
+
+        api_base = "https://api.github.com"
+        headers = _github_headers()
+
+        def api_url(path: str) -> str:
+            return f"{api_base}{path}"
+
+        files_text: list[tuple[str, str]] = []
+        total_bytes = 0
+
+        async with httpx.AsyncClient(timeout=20.0, follow_redirects=False) as client:
+            try:
+                # Resolve default branch if ref is not provided.
+                if not ref:
+                    r = await client.get(api_url(f"/repos/{owner}/{repo}"), headers=headers)
+                    if r.status_code == 404:
+                        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Repo not found"})
+                    if r.status_code == 401 or r.status_code == 403:
+                        raise HTTPException(
+                            status_code=401,
+                            detail={"code": "unauthorized", "message": "GitHub auth required"},
+                        )
+                    r.raise_for_status()
+                    ref = str(r.json().get("default_branch") or "main")
+
+                # Resolve commit -> tree sha.
+                c = await client.get(api_url(f"/repos/{owner}/{repo}/commits/{ref}"), headers=headers)
+                if c.status_code == 404:
+                    raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Ref not found"})
+                if c.status_code == 401 or c.status_code == 403:
+                    raise HTTPException(
+                        status_code=401,
+                        detail={"code": "unauthorized", "message": "GitHub auth required"},
+                    )
+                c.raise_for_status()
+                commit = c.json()
+                tree_sha = ((commit.get("commit") or {}).get("tree") or {}).get("sha")
+                if not tree_sha:
+                    raise HTTPException(
+                        status_code=500,
+                        detail={"code": "github_error", "message": "Failed to resolve tree"},
+                    )
+
+                t = await client.get(
+                    api_url(f"/repos/{owner}/{repo}/git/trees/{tree_sha}?recursive=1"),
+                    headers=headers,
+                )
+                if t.status_code == 401 or t.status_code == 403:
+                    raise HTTPException(
+                        status_code=401,
+                        detail={"code": "unauthorized", "message": "GitHub auth required"},
+                    )
+                t.raise_for_status()
+                tree = t.json().get("tree")
+                if not isinstance(tree, list):
+                    raise HTTPException(
+                        status_code=500,
+                        detail={"code": "github_error", "message": "Invalid tree response"},
+                    )
+
+                candidates = []
+                for node in tree:
+                    if not isinstance(node, dict):
+                        continue
+                    if node.get("type") != "blob":
+                        continue
+                    path = str(node.get("path") or "")
+                    if not path:
+                        continue
+                    if prefix and not path.startswith(prefix.rstrip("/") + "/") and path != prefix.rstrip("/"):
+                        continue
+                    size = int(node.get("size") or 0)
+                    if size <= 0 or size > max_file_bytes:
+                        continue
+                    # Simple extension filter.
+                    lower = path.lower()
+                    if not _GITHUB_TEXT_FILE_RE.search(lower):
+                        continue
+                    candidates.append((path, size))
+
+                candidates.sort(key=lambda x: x[1])
+                candidates = candidates[:max_files]
+
+                job.progress = {"files": len(candidates), "indexedFiles": 0, "bytes": 0}
+                await self._update_job(user_id, job)
+
+                for i, (path, size) in enumerate(candidates, start=1):
+                    if total_bytes + size > max_total_bytes:
+                        break
+                    # Contents endpoint; request raw bytes.
+                    content_url = api_url(f"/repos/{owner}/{repo}/contents/{path}")
+                    r = await client.get(
+                        content_url,
+                        headers={**headers, "Accept": "application/vnd.github.raw"},
+                        params={"ref": ref},
+                    )
+                    if r.status_code == 404:
+                        continue
+                    if r.status_code == 401 or r.status_code == 403:
+                        raise HTTPException(
+                            status_code=401,
+                            detail={"code": "unauthorized", "message": "GitHub auth required"},
+                        )
+                    r.raise_for_status()
+                    data = r.content[: max_file_bytes + 1]
+                    if len(data) > max_file_bytes:
+                        continue
+                    if _looks_binary(data):
+                        continue
+                    text = data.decode("utf-8", errors="ignore").strip()
+                    if not text:
+                        continue
+                    files_text.append((path, text))
+                    total_bytes += len(data)
+                    job.progress = {"files": len(candidates), "indexedFiles": len(files_text), "bytes": total_bytes}
+                    await self._update_job(user_id, job)
+                    await asyncio.sleep(0.05)
+
+            except asyncio.CancelledError:
+                job.status = "canceled"
+                job.error = None
+                await self._update_job(user_id, job)
+                return
+            except HTTPException as e:
+                job.status = "failed"
+                job.error = str((e.detail or {}).get("message") or e.detail or "GitHub indexing failed")
+                await self._update_job(user_id, job)
+                return
+            except Exception as e:
+                job.status = "failed"
+                job.error = str(e)
+                await self._update_job(user_id, job)
+                return
+
+        if not files_text:
+            job.status = "failed"
+            job.error = "No indexable files found"
+            await self._update_job(user_id, job)
+            return
+
+        combined = []
+        for path, text in files_text:
+            combined.append(f"FILE: {path}\n\n{text}\n\n---\n")
+        combined_text = "\n".join(combined).strip()
+        result = add_rag_document(
+            user_id,
+            name=f"GitHub: {owner}/{repo}@{ref}",
+            text=combined_text,
+            source=f"https://github.com/{owner}/{repo}",
+        )
+        job.status = "succeeded"
+        job.result = {"files": len(files_text), "ragDoc": result}
+        job.progress = {"files": job.progress.get("files", 0), "indexedFiles": len(files_text), "bytes": total_bytes}
         await self._update_job(user_id, job)

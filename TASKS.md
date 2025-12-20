@@ -43,7 +43,7 @@ Legend:
 ## P2/P3 — MCP registry
 - [~] First-class MCP registry storage (per-user persistence via backend).
 - [~] Admin-managed MCP templates (server-side persisted).
-- [~] “Test connection” (browser/CORS; SSRF-safe server proxy pending).
+- [x] “Test connection” (server-side, SSRF-safe).
 - [x] “List tools” (via `/api/mcp/tools`).
 - [x] Tool allow/deny policy (UI + server-side enforcement).
 - [x] Import/export `mcp.json` via UI with validation.
@@ -52,7 +52,7 @@ Legend:
 - [x] Clarify “password manager” scope and threat model (`docs/PASSWORD_MANAGER_SCOPE.md`).
 - [x] Document upload indexing connector (MVP: text-only, keyword search).
 - [~] Website crawler indexing (MVP: same-origin crawl with depth/pages, basic robots, private-host blocking).
-- [ ] GitHub repo indexing connector (branch/path filters + token support).
+- [~] GitHub repo indexing connector (MVP: owner/repo + ref + path prefix; token via env).
 - [~] Jobs UI (MVP: start/cancel/list crawl jobs).
 
 ## P3 — P2P pubsub chat + account manager
