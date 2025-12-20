@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -61,12 +61,12 @@ async def get_mcp_registry(http_request: Request):
     user = await require_user_from_request(http_request)
     path = _registry_path(str(user.get("id") or ""))
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
         return {"version": 1, "servers": []}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.put("/api/user/mcp-registry")
@@ -92,4 +92,4 @@ async def put_mcp_registry(body: McpRegistry, http_request: Request):
             f.write("\n")
         return {"ok": True, "count": len(servers)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

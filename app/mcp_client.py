@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Optional
 
 from fastapi import HTTPException
 
@@ -10,11 +9,11 @@ from fastapi import HTTPException
 class McpStdioClient:
     def __init__(self, command: list[str]):
         self.command = command
-        self.proc: Optional[asyncio.subprocess.Process] = None
+        self.proc: asyncio.subprocess.Process | None = None
         self._lock = asyncio.Lock()
         self._pending: dict[int, asyncio.Future] = {}
         self._next_id = 1
-        self._reader_task: Optional[asyncio.Task] = None
+        self._reader_task: asyncio.Task | None = None
         self._initialized = False
 
     async def start(self) -> None:
@@ -69,7 +68,7 @@ class McpStdioClient:
             if fut and not fut.done():
                 fut.set_result(msg)
 
-    async def _rpc(self, method: str, params: Optional[dict] = None) -> dict:
+    async def _rpc(self, method: str, params: dict | None = None) -> dict:
         await self.start()
         assert self.proc and self.proc.stdin
         async with self._lock:
@@ -111,4 +110,3 @@ class McpStdioClient:
 
     async def call_tool(self, name: str, arguments: dict) -> dict:
         return await self._rpc("tools/call", {"name": name, "arguments": arguments})
-

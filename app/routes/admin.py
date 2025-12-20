@@ -48,7 +48,7 @@ async def get_mcp_templates(http_request: Request):
     except FileNotFoundError:
         return {"version": 1, "templates": []}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.put("/api/admin/mcp-templates")
@@ -73,5 +73,4 @@ async def put_mcp_templates(body: McpTemplates, http_request: Request):
         path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         return {"ok": True, "count": len(templates)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+        raise HTTPException(status_code=500, detail=str(e)) from e

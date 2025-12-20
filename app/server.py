@@ -9,12 +9,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.mcp_client import McpStdioClient
+from app.routes.admin import router as admin_router
 from app.routes.base import router as base_router
 from app.routes.chat import router as chat_router
 from app.routes.codex import router as codex_router
 from app.routes.mcp import router as mcp_router
 from app.routes.terminal import router as terminal_router
-from app.routes.admin import router as admin_router
 from app.routes.user import router as user_router
 
 _ROOT = Path(__file__).resolve().parent.parent

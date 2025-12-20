@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Optional
+from typing import Any
 
 
-def safe_user_workdir(user: dict[str, Any], requested: Optional[str]) -> str:
+def safe_user_workdir(user: dict[str, Any], requested: str | None) -> str:
     """
     Restrict Codex workdir to an allowlisted root to prevent traversal.
     """
@@ -28,4 +28,3 @@ def safe_user_workdir(user: dict[str, Any], requested: Optional[str]) -> str:
 
     os.makedirs(user_root, exist_ok=True)
     return user_root
-

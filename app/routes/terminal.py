@@ -8,7 +8,7 @@ import pty
 import struct
 import subprocess
 import termios
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, WebSocket
 
@@ -57,7 +57,7 @@ async def websocket_terminal(websocket: WebSocket):
                     "refresh_token": refresh_token,
                     "account_id": account_id,
                 },
-                "last_refresh": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "last_refresh": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             }
             for filename in ("auth.json", ".auth.json"):
                 path = os.path.join(codex_home, filename)
@@ -137,4 +137,3 @@ async def websocket_terminal(websocket: WebSocket):
         write_task.cancel()
         p.terminate()
         os.close(master_fd)
-

@@ -1,5 +1,3 @@
-import os
-
 import pytest
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
@@ -47,4 +45,3 @@ def test_features_can_be_disabled(monkeypatch: pytest.MonkeyPatch):
 
     res = c.get("/api/codex/login/status")
     assert res.status_code == 403
-

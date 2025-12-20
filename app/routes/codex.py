@@ -6,7 +6,6 @@ import os
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -21,14 +20,14 @@ router = APIRouter()
 
 class CodexRequest(BaseModel):
     message: str
-    threadId: Optional[str] = None
-    model: Optional[str] = None
-    sandboxMode: Optional[str] = "workspace-write"
-    approvalPolicy: Optional[str] = "never"
-    apiKey: Optional[str] = None
-    baseUrl: Optional[str] = None
-    modelReasoningEffort: Optional[str] = "minimal"
-    workingDirectory: Optional[str] = None
+    threadId: str | None = None
+    model: str | None = None
+    sandboxMode: str | None = "workspace-write"
+    approvalPolicy: str | None = "never"
+    apiKey: str | None = None
+    baseUrl: str | None = None
+    modelReasoningEffort: str | None = "minimal"
+    workingDirectory: str | None = None
 
 
 @router.post("/api/codex")
@@ -83,7 +82,7 @@ async def codex_agent(request: CodexRequest, http_request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 def _with_codex_agent_prefix(message: str) -> str:
@@ -180,7 +179,7 @@ async def codex_agent_cli(request: CodexRequest, http_request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/api/codex/cli/stream")
@@ -367,11 +366,11 @@ class DeviceLoginAttempt:
     id: str
     proc: asyncio.subprocess.Process
     created_at: float
-    url: Optional[str] = None
-    code: Optional[str] = None
-    output: List[str] = field(default_factory=list)
+    url: str | None = None
+    code: str | None = None
+    output: list[str] = field(default_factory=list)
     done: bool = False
-    returncode: Optional[int] = None
+    returncode: int | None = None
 
 
 async def _read_device_login_output(attempt: DeviceLoginAttempt) -> None:

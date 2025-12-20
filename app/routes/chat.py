@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, List, Optional, Union
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -14,14 +14,14 @@ router = APIRouter()
 class ChatMessage(BaseModel):
     role: str
     # OpenAI-compatible: content can be plain text or an array of multimodal parts.
-    content: Union[str, List[Any]]
+    content: str | list[Any]
 
 
 class ChatRequest(BaseModel):
-    messages: List[ChatMessage]
-    apiKey: Optional[str] = None
-    baseUrl: Optional[str] = None
-    model: Optional[str] = "gpt-3.5-turbo"
+    messages: list[ChatMessage]
+    apiKey: str | None = None
+    baseUrl: str | None = None
+    model: str | None = "gpt-3.5-turbo"
 
 
 @router.post("/api/chat")
@@ -51,8 +51,8 @@ async def chat_endpoint(request: ChatRequest):
 
 
 class ModelsRequest(BaseModel):
-    apiKey: Optional[str] = None
-    baseUrl: Optional[str] = None
+    apiKey: str | None = None
+    baseUrl: str | None = None
 
 
 @router.post("/api/proxy/models")
@@ -80,5 +80,4 @@ async def proxy_models(request: ModelsRequest):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
+        raise HTTPException(status_code=500, detail=str(e)) from e
