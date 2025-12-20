@@ -27,8 +27,8 @@ Legend:
 
 ## P2 — Provider auth parity (Codex/Gemini/Claude)
 - [x] Codex auth file generation from env/secrets (`~/.codex/.auth.json` and `~/.codex/auth.json`).
-- [ ] Gemini auth file parity (only if CLI requires; otherwise env-only with docs).
-- [ ] Claude auth file parity (only if CLI requires; otherwise env-only with docs).
+- [x] Gemini auth (env-only via `GEMINI_API_KEY`, documented).
+- [x] Claude auth (env-only via `ANTHROPIC_API_KEY`, documented).
 - [x] Optional SSH key support via Secrets (`SSH_PRIVATE_KEY`, `SSH_PUBLIC_KEY`, `SSH_KNOWN_HOSTS`).
 
 ## P2 — Codex workspace directory (UI)
@@ -49,7 +49,7 @@ Legend:
 - [x] Import/export `mcp.json` via UI with validation.
 
 ## P3 — RAG + indexing (docs/web/GitHub) + “password manager”
-- [ ] Clarify “password manager” scope and threat model.
+- [x] Clarify “password manager” scope and threat model (`docs/PASSWORD_MANAGER_SCOPE.md`).
 - [x] Document upload indexing connector (MVP: text-only, keyword search).
 - [ ] Website crawler indexing (depth/allowlist/robots/rate limits).
 - [ ] GitHub repo indexing connector (branch/path filters + token support).

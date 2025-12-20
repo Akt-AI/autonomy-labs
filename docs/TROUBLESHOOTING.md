@@ -19,6 +19,12 @@ If you use env-based token auth, set one of:
 Notes:
 - You do not need to provide `last_refresh` as a Secret; it is written automatically.
 
+## Gemini / Claude CLI authentication
+
+This repo prefers env-based auth for provider CLIs (keep tokens out of git and UI):
+- Gemini: `GEMINI_API_KEY`
+- Claude: `ANTHROPIC_API_KEY`
+
 ## RAG endpoints return 403 (“Indexing is disabled”)
 
 Set `ENABLE_INDEXING=1` in your environment and restart the container.

@@ -70,6 +70,8 @@ This file is the repo-level roadmap for `autonomy-labs`. It’s intentionally op
   - GitHub repo indexing (branch/path filters, token support via Secrets)
 - Build a jobs UI: progress, retries, errors, and access controls.
 
+Note: see `docs/PASSWORD_MANAGER_SCOPE.md` for the current (non-vault) stance and recommended path forward.
+
 ## P3 — P2P pubsub chat + account manager
 - Implement account manager concepts:
   - identities/devices, room/topic membership, permissions, moderation tools
@@ -84,4 +86,3 @@ This file is the repo-level roadmap for `autonomy-labs`. It’s intentionally op
 - Add lint/tests + CI:
   - Python: `ruff`, `pytest`
   - basic security smoke tests for endpoint gating
-

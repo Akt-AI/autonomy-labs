@@ -44,6 +44,7 @@ uvicorn main:app --reload --host 0.0.0.0 --port 7860
 - High-risk features are gated by Supabase auth and flags (`ENABLE_TERMINAL`, `ENABLE_CODEX`, `ENABLE_MCP`, `ENABLE_INDEXING`). Keep defaults conservative and document changes in `SECURITY.md`.
 
 ## Deployment notes (HF Spaces)
+
 - Port: `7860`
 - Persistence: `/data` is used for `~/.codex`, `~/.ssh`, and a default workspace directory when available.
 - Web terminals often require device auth flows; avoid localhost callback assumptions.
