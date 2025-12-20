@@ -12,6 +12,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("ENABLE_TERMINAL", "1")
     monkeypatch.setenv("ENABLE_CODEX", "1")
     monkeypatch.setenv("ENABLE_MCP", "1")
+    monkeypatch.setenv("ENABLE_ROOMS", "1")
     app = create_app()
     return TestClient(app)
 
@@ -36,6 +37,20 @@ def test_terminal_ws_requires_token(client: TestClient):
         assert "unauthorized" in msg.lower() or msg == ""
 
 
+def test_rooms_list_requires_auth(client: TestClient):
+    res = client.get("/api/rooms")
+    assert res.status_code == 401
+
+
+def test_rooms_ws_requires_token(client: TestClient):
+    with client.websocket_connect("/ws/rooms?roomId=x&deviceId=y") as ws:
+        try:
+            msg = ws.receive_text()
+        except WebSocketDisconnect:
+            msg = ""
+        assert "missing_token" in msg or msg == ""
+
+
 def test_features_can_be_disabled(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
     monkeypatch.setenv("SUPABASE_KEY", "dummy")
@@ -44,4 +59,15 @@ def test_features_can_be_disabled(monkeypatch: pytest.MonkeyPatch):
     c = TestClient(app)
 
     res = c.get("/api/codex/login/status")
+    assert res.status_code == 403
+
+
+def test_rooms_can_be_disabled(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setenv("SUPABASE_KEY", "dummy")
+    monkeypatch.setenv("ENABLE_ROOMS", "0")
+    app = create_app()
+    c = TestClient(app)
+
+    res = c.get("/api/rooms")
     assert res.status_code == 403

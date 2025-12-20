@@ -40,12 +40,14 @@ async def read_app():
 
 @router.get("/settings")
 async def read_settings():
-    return FileResponse(str(_STATIC / "settings.html"))
+    # Dedicated route: render the main app, but have the UI auto-open Settings for deep links.
+    return FileResponse(str(_STATIC / "dashboard.html"))
 
 
 @router.get("/admin")
 async def read_admin():
-    return FileResponse(str(_STATIC / "admin.html"))
+    # Dedicated route: render the main app, but have the UI auto-open Admin for deep links.
+    return FileResponse(str(_STATIC / "dashboard.html"))
 
 
 @router.get("/health")

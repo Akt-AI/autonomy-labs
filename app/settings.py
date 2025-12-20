@@ -20,14 +20,15 @@ def feature_enabled(feature: str) -> bool:
         "codex": has_supabase,
         "mcp": has_supabase,
         "indexing": False,
+        "rooms": has_supabase,
     }
     env_map = {
         "terminal": "ENABLE_TERMINAL",
         "codex": "ENABLE_CODEX",
         "mcp": "ENABLE_MCP",
         "indexing": "ENABLE_INDEXING",
+        "rooms": "ENABLE_ROOMS",
     }
     if feature not in env_map:
         return False
     return env_truthy(env_map[feature], default=defaults[feature])
-

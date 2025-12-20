@@ -15,12 +15,14 @@ from app.codex_runs import CodexRunStore
 from app.errors import normalize_error
 from app.indexing_jobs import IndexJobStore
 from app.mcp_client import McpStdioClient
+from app.rooms_store import RoomsStore
 from app.routes.admin import router as admin_router
 from app.routes.base import router as base_router
 from app.routes.chat import router as chat_router
 from app.routes.codex import router as codex_router
 from app.routes.indexing import router as indexing_router
 from app.routes.mcp import router as mcp_router
+from app.routes.rooms import router as rooms_router
 from app.routes.rag import router as rag_router
 from app.routes.terminal import router as terminal_router
 from app.routes.user import router as user_router
@@ -33,6 +35,9 @@ async def lifespan(app: FastAPI):
     app.state.codex_mcp_client = McpStdioClient(["codex", "mcp-server"])
     app.state.codex_run_store = CodexRunStore()
     app.state.index_job_store = IndexJobStore()
+    app.state.rooms_store = RoomsStore()
+    app.state.rooms_connections = {}
+    app.state.rooms_lock = asyncio.Lock()
     app.state.device_login_attempts = {}
     app.state.device_login_lock = asyncio.Lock()
     stop = asyncio.Event()
@@ -112,6 +117,7 @@ def create_app() -> FastAPI:
     app.include_router(indexing_router)
     app.include_router(mcp_router)
     app.include_router(terminal_router)
+    app.include_router(rooms_router)
     app.include_router(user_router)
     app.include_router(admin_router)
     app.include_router(rag_router)

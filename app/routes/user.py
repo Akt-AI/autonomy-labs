@@ -44,6 +44,7 @@ async def me(http_request: Request):
             "codex": feature_enabled("codex"),
             "mcp": feature_enabled("mcp"),
             "indexing": feature_enabled("indexing"),
+            "rooms": feature_enabled("rooms"),
         },
     }
 

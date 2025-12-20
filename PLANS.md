@@ -13,7 +13,7 @@ This file is the repo-level roadmap for `autonomy-labs`. It’s intentionally op
   - any indexing endpoints (docs/web/GitHub)
 - Define a clear auth transport for WebSockets (cookie or token) and verify on the server.
 - Add capability flags with safe defaults:
-  - `ENABLE_TERMINAL`, `ENABLE_CODEX`, `ENABLE_MCP`, `ENABLE_INDEXING`
+  - `ENABLE_TERMINAL`, `ENABLE_CODEX`, `ENABLE_MCP`, `ENABLE_INDEXING`, `ENABLE_ROOMS`
 - Add `SECURITY.md` with threat model + safe deployment guidance.
 
 ## P1 — Backend refactor + lifecycle

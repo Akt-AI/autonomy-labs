@@ -10,7 +10,7 @@ Legend:
 ## P0 — Security + correctness
 - [x] Gate dangerous endpoints server-side (`/ws/terminal`, `/api/codex*`, `/api/mcp*`).
 - [x] Define WebSocket auth transport (token in query string for `/ws/terminal`).
-- [x] Add capability flags (`ENABLE_TERMINAL`, `ENABLE_CODEX`, `ENABLE_MCP`, `ENABLE_INDEXING`) with safe defaults.
+- [x] Add capability flags (`ENABLE_TERMINAL`, `ENABLE_CODEX`, `ENABLE_MCP`, `ENABLE_INDEXING`, `ENABLE_ROOMS`) with safe defaults.
 - [x] Add `SECURITY.md` with threat model + guidance.
 
 ## P1 — Backend refactor + lifecycle
@@ -57,8 +57,8 @@ Legend:
 
 ## P3 — P2P pubsub chat + account manager
 - [ ] Account manager: identities/devices, memberships, permissions, moderation.
-- [ ] Transport: WebRTC DataChannel + signaling, with server pubsub fallback.
-- [ ] UX: rooms, presence, delivery status, network mode indicators.
+- [~] Transport: WebRTC DataChannel + signaling, with server pubsub fallback.
+- [~] UX: rooms, presence, delivery status, network mode indicators.
 
 ## Engineering hygiene
 - [x] Add `.env.example`.

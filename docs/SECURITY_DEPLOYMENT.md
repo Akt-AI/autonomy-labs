@@ -16,12 +16,15 @@ Consider explicitly setting:
 - `ENABLE_TERMINAL=0` unless you truly need it
 - `ENABLE_CODEX=0` unless you truly need it
 - `ENABLE_MCP=0` unless you truly need it
+- `ENABLE_ROOMS=0` unless you need multi-user rooms/presence
 
 ## WebSocket auth
 
 Browsers cannot set `Authorization` headers on WebSockets, so `/ws/terminal` expects a Supabase access token via `?token=...`.
 
 Treat access tokens as sensitive; do not log them.
+
+Rooms use the same pattern on `/ws/rooms`.
 
 ## SSH keys
 
@@ -31,4 +34,3 @@ Optional: supply keys via secrets:
 - `SSH_PRIVATE_KEY` (required)
 - `SSH_PUBLIC_KEY` (optional)
 - `SSH_KNOWN_HOSTS` (optional)
-

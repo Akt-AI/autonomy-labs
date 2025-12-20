@@ -16,6 +16,7 @@ A lightweight web UI for chat + autonomous mode + terminal tabs, backed by FastA
 - **AI Chat** with markdown + KaTeX math rendering, stop-generation, and provider presets.
 - **Autonomous Mode** with resizable split panes (chat + terminal).
 - **Terminal** tabs over WebSockets (PTY-backed), Ubuntu-like theme, resizable viewport.
+- **Rooms (MVP)** with server pubsub + optional P2P DataChannel.
 - **Multimodal input**: attach/paste images and take a screenshot (browser screen capture).
 - **Saved providers**: store per-user provider configs (API key + base URL + model) in Supabase.
 - **Chat history**: persists sessions/messages in Supabase with delete-from-history.

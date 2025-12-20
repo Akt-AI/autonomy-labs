@@ -31,3 +31,17 @@ def user_data_dir(user_id: str) -> Path:
     fallback.mkdir(parents=True, exist_ok=True)
     return fallback
 
+
+def global_data_dir() -> Path:
+    """
+    Returns a global writable directory for shared server-side persistence.
+
+    Prefers `/data` (HF Spaces) and falls back to `~/.autonomy-labs`.
+    """
+    preferred = Path("/data") / "autonomy-labs" / "global"
+    if preferred.parent.exists() and _writable_dir(preferred):
+        return preferred
+
+    fallback = Path(os.path.expanduser("~")) / ".autonomy-labs" / "global"
+    fallback.mkdir(parents=True, exist_ok=True)
+    return fallback

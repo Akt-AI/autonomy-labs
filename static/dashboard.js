@@ -167,7 +167,21 @@ let supabase;
             if (paneTerminal && paneTerminal.classList.contains('hidden')) toggleAgentTerminalCollapsed();
         }
 
+        function currentPath() {
+            try { return String(location.pathname || ''); } catch { return '/app'; }
+        }
+
+        function setAppRoute(path) {
+            try {
+                if (!path) return;
+                if (currentPath() === path) return;
+                history.pushState({}, '', path);
+            } catch { }
+        }
+
         function openSettings() {
+            const p = currentPath();
+            if (p !== '/settings' && p !== '/admin') setAppRoute('/settings');
             const overlay = document.getElementById('settings-overlay');
             const drawer = document.getElementById('settings-drawer');
             if (!overlay || !drawer) return;
@@ -178,6 +192,7 @@ let supabase;
         }
 
         function openAdmin() {
+            if (currentPath() !== '/admin') setAppRoute('/admin');
             openSettings();
             const admin = document.getElementById('admin-panel');
             if (admin) admin.scrollIntoView({ block: 'nearest' });
@@ -191,6 +206,8 @@ let supabase;
             if (!overlay || !drawer) return;
             overlay.classList.add('settings-hidden');
             drawer.classList.add('settings-hidden');
+            const p = currentPath();
+            if (p === '/settings' || p === '/admin') setAppRoute('/app');
         }
 
         function toggleSettings() {
@@ -340,11 +357,18 @@ let supabase;
             const panel = document.getElementById('admin-panel');
             const status = document.getElementById('admin-status');
             const features = document.getElementById('admin-features');
+            const roomsNav = document.getElementById('nav-rooms');
+            const roomsMobile = document.getElementById('mobile-rooms');
 
             const isAdmin = !!me?.isAdmin;
             if (navBtn) navBtn.classList.toggle('hidden', !isAdmin);
             if (mobileBtn) mobileBtn.classList.toggle('hidden', !isAdmin);
             if (panel) panel.classList.toggle('hidden', !isAdmin);
+
+            const roomsEnabled = !!me?.features?.rooms;
+            if (roomsNav) roomsNav.classList.toggle('hidden', !roomsEnabled);
+            if (roomsMobile) roomsMobile.classList.toggle('hidden', !roomsEnabled);
+
             if (!isAdmin) return;
 
             if (status) status.textContent = `Admin: ${me?.email || me?.id || 'unknown'}`;
@@ -355,6 +379,7 @@ let supabase;
                     `<div class=\"bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2\">codex: <span class=\"text-gray-100\">${f.codex ? 'on' : 'off'}</span></div>`,
                     `<div class=\"bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2\">mcp: <span class=\"text-gray-100\">${f.mcp ? 'on' : 'off'}</span></div>`,
                     `<div class=\"bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2\">indexing: <span class=\"text-gray-100\">${f.indexing ? 'on' : 'off'}</span></div>`,
+                    `<div class=\"bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2\">rooms: <span class=\"text-gray-100\">${f.rooms ? 'on' : 'off'}</span></div>`,
                 ].join('');
             }
         }
@@ -880,6 +905,22 @@ let supabase;
                 setCodexShowJsonl(getCodexShowJsonl());
                 setAgentUseCodexCli(getAgentUseCodexCli());
 
+                // Rooms settings
+                const roomsPrefer = document.getElementById('rooms-prefer-p2p');
+                if (roomsPrefer) {
+                    roomsPrefer.checked = getRoomsPreferP2p();
+                    roomsPrefer.addEventListener('change', () => setRoomsPreferP2p(roomsPrefer.checked));
+                }
+                const roomsInput = document.getElementById('rooms-input');
+                if (roomsInput) {
+                    roomsInput.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            sendRoomMessage();
+                        }
+                    });
+                }
+
                 // Multi-modal attachments
                 const chatFile = document.getElementById('chat-file-input');
                 const agentFile = document.getElementById('agent-file-input');
@@ -976,6 +1017,11 @@ let supabase;
                 // Route helpers
                 if (location.pathname === '/settings') openSettings();
                 if (location.pathname === '/admin') openAdmin();
+                window.addEventListener('popstate', () => {
+                    if (location.pathname === '/settings') openSettings();
+                    else if (location.pathname === '/admin') openAdmin();
+                    else closeSettings();
+                });
                 try {
                     if (sessionStorage.getItem('open_settings_on_load_v1') === '1') {
                         sessionStorage.removeItem('open_settings_on_load_v1');
@@ -992,7 +1038,7 @@ let supabase;
 
         // --- View Switching ---
         function switchMode(mode) {
-            const sections = ['dashboard', 'chat', 'terminal', 'notes'];
+            const sections = ['dashboard', 'chat', 'terminal', 'notes', 'rooms'];
             sections.forEach((m) => {
                 const el = document.getElementById(`${m}-view`);
                 const btn = document.getElementById(`nav-${m}`);
@@ -1006,6 +1052,7 @@ let supabase;
                 if (activeTerminalId) setTimeout(() => fitTerm(activeTerminalId), 50);
             }
             if (mode === 'notes') setTimeout(() => { applyNotesLayout(); refreshNotesTree(); }, 0);
+            if (mode === 'rooms') setTimeout(() => { loadRoomsList(); }, 0);
 
             document.getElementById('mobile-menu').classList.add('hidden');
         }
@@ -3039,6 +3086,473 @@ let supabase;
                 document.getElementById('chat-api-key').value = config.apiKey || '';
                 document.getElementById('chat-base-url').value = config.baseUrl || '';
                 document.getElementById('chat-model').value = config.model || '';
+            }
+        }
+
+        // --- Rooms (P2P PubSub MVP) ---
+        let roomsWs = null;
+        let roomsActiveRoomId = null;
+        let roomsPeers = [];
+        let roomsP2P = new Map(); // deviceId -> { pc, dc, polite, makingOffer, ignoreOffer }
+
+        function getDeviceId() {
+            const key = 'device_id_v1';
+            let id = (localStorage.getItem(key) || '').trim();
+            if (!id) {
+                id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())) + '-' + Math.random().toString(16).slice(2);
+                localStorage.setItem(key, id);
+            }
+            return id;
+        }
+
+        function getRoomsPreferP2p() {
+            return localStorage.getItem('rooms_prefer_p2p_v1') === '1';
+        }
+
+        function setRoomsPreferP2p(enabled) {
+            localStorage.setItem('rooms_prefer_p2p_v1', enabled ? '1' : '0');
+            const el = document.getElementById('rooms-prefer-p2p');
+            if (el) el.checked = !!enabled;
+            if (!enabled) closeAllRoomP2p();
+            else maybeStartRoomP2p();
+        }
+
+        function setRoomsConnStatus(text) {
+            const el = document.getElementById('rooms-conn-status');
+            if (el) el.textContent = text;
+        }
+
+        function setRoomsPeersCount() {
+            const el = document.getElementById('rooms-peers');
+            if (el) el.textContent = `Peers: ${roomsPeers.length}`;
+        }
+
+        function setRoomsStatus(text) {
+            const el = document.getElementById('rooms-status');
+            if (el) el.textContent = text || '';
+        }
+
+        function renderRoomsMessagesEmpty(text) {
+            const box = document.getElementById('rooms-messages');
+            if (!box) return;
+            box.innerHTML = '';
+            const div = document.createElement('div');
+            div.className = 'text-sm text-gray-500';
+            div.textContent = text;
+            box.appendChild(div);
+        }
+
+        function appendRoomMessage(msg) {
+            const box = document.getElementById('rooms-messages');
+            if (!box) return;
+            const fromDevice = String(msg?.fromDeviceId || '').trim();
+            const isMe = fromDevice && fromDevice === getDeviceId();
+
+            const wrap = document.createElement('div');
+            wrap.className = `max-w-[90%] ${isMe ? 'ml-auto' : 'mr-auto'}`;
+
+            const bubble = document.createElement('div');
+            bubble.className = `px-3 py-2 rounded-xl border shadow-sm text-sm break-words ${isMe
+                ? 'bg-blue-600/20 border-blue-500/30 text-gray-100'
+                : 'bg-gray-800/60 border-gray-700 text-gray-100'
+                }`;
+
+            const meta = document.createElement('div');
+            meta.className = 'text-[11px] text-gray-400 mb-1 flex items-center justify-between gap-3';
+            const who = document.createElement('span');
+            who.textContent = isMe ? 'you' : (fromDevice ? fromDevice.slice(0, 8) : 'peer');
+            const ts = document.createElement('span');
+            ts.textContent = String(msg?.ts || '');
+            meta.appendChild(who);
+            meta.appendChild(ts);
+
+            const text = document.createElement('div');
+            text.textContent = String(msg?.text || '');
+
+            bubble.appendChild(meta);
+            bubble.appendChild(text);
+            wrap.appendChild(bubble);
+            box.appendChild(wrap);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function renderRoomsList(rooms) {
+            const list = document.getElementById('rooms-list');
+            if (!list) return;
+            list.innerHTML = '';
+            const items = Array.isArray(rooms) ? rooms : [];
+            if (!items.length) {
+                const empty = document.createElement('div');
+                empty.className = 'text-xs text-gray-500 p-2';
+                empty.textContent = 'No rooms yet. Create one or join by ID.';
+                list.appendChild(empty);
+                return;
+            }
+            for (const r of items) {
+                const rid = String(r?.id || '').trim();
+                if (!rid) continue;
+                const btn = document.createElement('button');
+                btn.className = `w-full text-left px-3 py-2 rounded-lg border text-sm transition ${rid === roomsActiveRoomId
+                    ? 'bg-gray-900/60 border-blue-500/40'
+                    : 'bg-gray-900/30 border-gray-700 hover:bg-gray-900/50'
+                    }`;
+
+                const name = String(r?.name || 'Room');
+                const meta = `${String(r?.memberCount ?? '')} members`;
+                const title = document.createElement('div');
+                title.className = 'text-gray-100 font-semibold truncate';
+                title.textContent = name;
+                const sub = document.createElement('div');
+                sub.className = 'text-xs text-gray-400 truncate';
+                sub.textContent = `${rid} • ${meta}`;
+
+                btn.appendChild(title);
+                btn.appendChild(sub);
+                btn.onclick = () => setActiveRoom(rid, name);
+                list.appendChild(btn);
+            }
+        }
+
+        async function loadRoomsList() {
+            if (!document.getElementById('rooms-list')) return;
+            try {
+                setRoomsStatus('Loading…');
+                const res = await authFetch('/api/rooms');
+                if (!res.ok) {
+                    setRoomsStatus(`HTTP ${res.status}`);
+                    return;
+                }
+                const data = await res.json();
+                renderRoomsList(data?.rooms || []);
+                setRoomsStatus('');
+            } catch (e) {
+                setRoomsStatus(String(e?.message || e));
+            }
+        }
+
+        async function createRoom() {
+            try {
+                const name = prompt('Room name (optional):', 'Room') || 'Room';
+                const res = await authFetch('/api/rooms', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name }),
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                const room = data?.room;
+                await loadRoomsList();
+                if (room?.id) await setActiveRoom(room.id, room.name || 'Room');
+            } catch (e) {
+                alert(`Create room failed: ${e?.message || e}`);
+            }
+        }
+
+        async function joinRoomFromInput() {
+            const el = document.getElementById('rooms-join-id');
+            const roomId = (el?.value || '').trim();
+            if (!roomId) return;
+            if (el) el.value = '';
+            await joinRoom(roomId);
+        }
+
+        async function joinRoom(roomId) {
+            try {
+                const res = await authFetch('/api/rooms/join', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roomId }),
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                await loadRoomsList();
+                const room = data?.room;
+                await setActiveRoom(room?.id || roomId, room?.name || 'Room');
+            } catch (e) {
+                alert(`Join failed: ${e?.message || e}`);
+            }
+        }
+
+        async function leaveActiveRoom() {
+            const rid = roomsActiveRoomId;
+            if (!rid) return;
+            if (!confirm('Leave this room?')) return;
+            try {
+                await authFetch(`/api/rooms/${encodeURIComponent(rid)}/leave`, { method: 'POST' });
+            } catch { }
+            disconnectRoomsWs();
+            roomsActiveRoomId = null;
+            roomsPeers = [];
+            closeAllRoomP2p();
+            updateRoomsHeader(null, null);
+            renderRoomsMessagesEmpty('No room selected.');
+            await loadRoomsList();
+        }
+
+        function copyActiveRoomId() {
+            const rid = roomsActiveRoomId;
+            if (!rid) return;
+            navigator.clipboard.writeText(rid).catch(() => { });
+        }
+
+        function updateRoomsHeader(roomId, name) {
+            const title = document.getElementById('rooms-active-title');
+            const sub = document.getElementById('rooms-active-subtitle');
+            if (title) title.textContent = name ? String(name) : 'Select a room';
+            if (sub) sub.textContent = roomId ? String(roomId) : 'Create or join a room to start chatting.';
+        }
+
+        async function setActiveRoom(roomId, name) {
+            roomsActiveRoomId = String(roomId || '').trim();
+            updateRoomsHeader(roomsActiveRoomId, name || 'Room');
+            renderRoomsMessagesEmpty('Loading…');
+            await loadRoomsList();
+            await loadRoomHistory();
+            await connectRoomsWs();
+        }
+
+        async function loadRoomHistory() {
+            const rid = roomsActiveRoomId;
+            if (!rid) return;
+            try {
+                const res = await authFetch(`/api/rooms/${encodeURIComponent(rid)}/messages?limit=80`);
+                if (!res.ok) return;
+                const data = await res.json();
+                const box = document.getElementById('rooms-messages');
+                if (!box) return;
+                box.innerHTML = '';
+                const msgs = Array.isArray(data?.messages) ? data.messages : [];
+                if (!msgs.length) {
+                    renderRoomsMessagesEmpty('No messages yet.');
+                    return;
+                }
+                for (const m of msgs) appendRoomMessage(m);
+            } catch {
+                renderRoomsMessagesEmpty('Failed to load messages.');
+            }
+        }
+
+        function disconnectRoomsWs() {
+            if (roomsWs) {
+                try { roomsWs.close(); } catch { }
+                roomsWs = null;
+            }
+            setRoomsConnStatus('Disconnected');
+        }
+
+        async function connectRoomsWs() {
+            disconnectRoomsWs();
+            const rid = roomsActiveRoomId;
+            if (!rid) return;
+            const token = await getAccessToken();
+            if (!token) {
+                setRoomsConnStatus('Missing auth token');
+                return;
+            }
+
+            const deviceId = getDeviceId();
+            const wsUrl = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/rooms`
+                + `?token=${encodeURIComponent(token)}`
+                + `&roomId=${encodeURIComponent(rid)}`
+                + `&deviceId=${encodeURIComponent(deviceId)}`;
+            roomsWs = new WebSocket(wsUrl);
+            setRoomsConnStatus('Connecting…');
+
+            roomsWs.onopen = () => {
+                setRoomsConnStatus('WS connected');
+                maybeStartRoomP2p();
+            };
+            roomsWs.onclose = () => {
+                setRoomsConnStatus('Disconnected');
+                closeAllRoomP2p();
+            };
+            roomsWs.onmessage = (event) => {
+                let msg;
+                try { msg = JSON.parse(event.data); } catch { return; }
+                const t = msg?.type || '';
+                if (t === 'presence.snapshot') {
+                    roomsPeers = Array.isArray(msg?.peers) ? msg.peers : [];
+                    setRoomsPeersCount();
+                    maybeStartRoomP2p();
+                    return;
+                }
+                if (t === 'presence.join') {
+                    const id = String(msg?.deviceId || '').trim();
+                    if (id && !roomsPeers.includes(id)) roomsPeers.push(id);
+                    setRoomsPeersCount();
+                    maybeStartRoomP2p();
+                    return;
+                }
+                if (t === 'presence.leave') {
+                    const id = String(msg?.deviceId || '').trim();
+                    roomsPeers = roomsPeers.filter((x) => x !== id);
+                    const entry = roomsP2P.get(id);
+                    if (entry) closeRoomP2pPeer(id, entry);
+                    setRoomsPeersCount();
+                    return;
+                }
+                if (t === 'chat.message') {
+                    appendRoomMessage(msg);
+                    return;
+                }
+                if (t === 'signal') {
+                    const from = String(msg?.fromDeviceId || '').trim();
+                    if (!from || from === getDeviceId()) return;
+                    handleRoomSignal(from, msg?.payload).catch(() => { });
+                }
+            };
+        }
+
+        function sendRoomsWs(obj) {
+            if (!roomsWs || roomsWs.readyState !== WebSocket.OPEN) return false;
+            try { roomsWs.send(JSON.stringify(obj)); return true; } catch { return false; }
+        }
+
+        function sendRoomMessage() {
+            const el = document.getElementById('rooms-input');
+            const text = (el?.value || '').trim();
+            if (!text) return;
+            if (el) el.value = '';
+
+            if (getRoomsPreferP2p()) {
+                const sent = sendRoomMessageViaP2p(text);
+                if (sent) return;
+            }
+            sendRoomsWs({ type: 'chat.send', text });
+        }
+
+        function sendRoomMessageViaP2p(text) {
+            let any = false;
+            for (const entry of roomsP2P.values()) {
+                if (!entry?.dc || entry.dc.readyState !== 'open') continue;
+                try {
+                    entry.dc.send(JSON.stringify({ type: 'chat.message', text, ts: new Date().toISOString() }));
+                    any = true;
+                } catch { }
+            }
+            if (any) {
+                appendRoomMessage({ text, ts: new Date().toISOString(), fromDeviceId: getDeviceId() });
+            }
+            return any;
+        }
+
+        function closeRoomP2pPeer(peerId, entry) {
+            try { entry.dc?.close(); } catch { }
+            try { entry.pc?.close(); } catch { }
+            roomsP2P.delete(peerId);
+        }
+
+        function closeAllRoomP2p() {
+            for (const [peerId, entry] of Array.from(roomsP2P.entries())) {
+                closeRoomP2pPeer(peerId, entry);
+            }
+        }
+
+        function maybeStartRoomP2p() {
+            const prefer = getRoomsPreferP2p();
+            if (!prefer) return;
+            if (typeof RTCPeerConnection === 'undefined') return;
+            const self = getDeviceId();
+            const peers = roomsPeers.filter((p) => p && p !== self);
+            for (const peerId of peers) {
+                if (roomsP2P.has(peerId)) continue;
+                initRoomP2pPeer(peerId);
+            }
+        }
+
+        function initRoomP2pPeer(peerId) {
+            const self = getDeviceId();
+            const polite = self > peerId;
+            const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+            let dc = null;
+
+            const entry = {
+                pc,
+                dc,
+                polite,
+                makingOffer: false,
+                ignoreOffer: false,
+            };
+            roomsP2P.set(peerId, entry);
+
+            pc.onicecandidate = (e) => {
+                if (!e.candidate) return;
+                sendRoomsWs({ type: 'signal', toDeviceId: peerId, payload: { kind: 'ice', candidate: e.candidate } });
+            };
+            pc.onconnectionstatechange = () => {
+                const anyOpen = Array.from(roomsP2P.values()).some((x) => x?.dc?.readyState === 'open');
+                setRoomsConnStatus(anyOpen ? 'WS + P2P' : (roomsWs && roomsWs.readyState === WebSocket.OPEN ? 'WS connected' : 'Disconnected'));
+            };
+            pc.ondatachannel = (e) => {
+                dc = e.channel;
+                entry.dc = dc;
+                wireRoomDataChannel(peerId, dc);
+            };
+
+            if (self < peerId) {
+                dc = pc.createDataChannel('chat');
+                entry.dc = dc;
+                wireRoomDataChannel(peerId, dc);
+            }
+
+            pc.onnegotiationneeded = async () => {
+                try {
+                    entry.makingOffer = true;
+                    await pc.setLocalDescription();
+                    sendRoomsWs({ type: 'signal', toDeviceId: peerId, payload: { kind: 'sdp', description: pc.localDescription } });
+                } catch { } finally {
+                    entry.makingOffer = false;
+                }
+            };
+        }
+
+        function wireRoomDataChannel(peerId, dc) {
+            dc.onopen = () => {
+                setRoomsConnStatus('WS + P2P');
+            };
+            dc.onmessage = (e) => {
+                let msg;
+                try { msg = JSON.parse(e.data); } catch { return; }
+                if (msg?.type === 'chat.message') {
+                    appendRoomMessage({ text: msg.text, ts: msg.ts, fromDeviceId: peerId });
+                }
+            };
+            dc.onclose = () => {
+                const entry = roomsP2P.get(peerId);
+                if (entry) closeRoomP2pPeer(peerId, entry);
+            };
+        }
+
+        async function handleRoomSignal(peerId, payload) {
+            if (!payload || typeof payload !== 'object') return;
+            if (typeof RTCPeerConnection === 'undefined') return;
+            let entry = roomsP2P.get(peerId);
+            if (!entry) {
+                initRoomP2pPeer(peerId);
+                entry = roomsP2P.get(peerId);
+            }
+            if (!entry) return;
+            const pc = entry.pc;
+
+            if (payload.kind === 'ice' && payload.candidate) {
+                try {
+                    await pc.addIceCandidate(payload.candidate);
+                } catch (e) {
+                    if (!entry.ignoreOffer) throw e;
+                }
+                return;
+            }
+
+            if (payload.kind === 'sdp' && payload.description) {
+                const desc = payload.description;
+                const offerCollision = desc.type === 'offer' && (entry.makingOffer || pc.signalingState !== 'stable');
+                entry.ignoreOffer = !entry.polite && offerCollision;
+                if (entry.ignoreOffer) return;
+                await pc.setRemoteDescription(desc);
+                if (desc.type === 'offer') {
+                    await pc.setLocalDescription();
+                    sendRoomsWs({ type: 'signal', toDeviceId: peerId, payload: { kind: 'sdp', description: pc.localDescription } });
+                }
             }
         }
 

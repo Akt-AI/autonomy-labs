@@ -64,3 +64,12 @@ The backend returns a consistent error payload like:
 If the backend prints `PTY allocation failed`, the runtime likely lacks `/dev/pts` or has exhausted PTYs.
 
 HF Spaces generally supports PTYs, but custom runtimes may not.
+
+## Rooms returns 403 (“Rooms are disabled”)
+
+Set `ENABLE_ROOMS=1` in your environment and restart the container.
+
+## P2P isn’t connecting in Rooms
+
+The Rooms view uses WebRTC DataChannels (optional, behind “Prefer P2P”). Some networks block UDP/WebRTC.
+If P2P fails, keep “Prefer P2P” off and it will use server WebSockets for messaging.
