@@ -66,7 +66,7 @@ async def get_mcp_registry(http_request: Request):
     except FileNotFoundError:
         return {"version": 1, "servers": []}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail={"code": "internal_error", "message": str(e)}) from e
 
 
 @router.put("/api/user/mcp-registry")
@@ -92,4 +92,4 @@ async def put_mcp_registry(body: McpRegistry, http_request: Request):
             f.write("\n")
         return {"ok": True, "count": len(servers)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail={"code": "internal_error", "message": str(e)}) from e

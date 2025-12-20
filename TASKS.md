@@ -17,13 +17,13 @@ Legend:
 - [x] Refactor backend into modules under `app/` and keep `uvicorn main:app` working.
 - [x] Add FastAPI lifespan management for MCP subprocess and device-login cleanup.
 - [x] Unify Codex integration (CLI-first for device-auth consistency).
-- [ ] Standardize API error schema across endpoints (single shape for UI).
+- [x] Standardize API error schema across endpoints (single shape for UI).
 
 ## P2 — UI/UX, settings, admin, landing
 - [x] Landing + route split (`/` landing, `/login`, `/app`) and UI redirects updated.
 - [x] Split `static/dashboard.html` into JS/CSS files (`static/dashboard.js`, `static/dashboard.css`).
 - [x] Theme tokens shared across login + dashboard (single source of truth via `static/theme.css`).
-- [~] Separate Settings vs Admin dashboard (admin section scaffolded; full dedicated pages pending).
+- [~] Separate Settings vs Admin dashboard (lightweight `/settings` and `/admin` entry pages; full dedicated pages pending).
 
 ## P2 — Provider auth parity (Codex/Gemini/Claude)
 - [x] Codex auth file generation from env/secrets (`~/.codex/.auth.json` and `~/.codex/auth.json`).

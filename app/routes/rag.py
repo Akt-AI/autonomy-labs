@@ -57,14 +57,14 @@ def _load_index(path: Path) -> dict:
     except FileNotFoundError:
         return {"version": 1, "documents": []}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail={"code": "internal_error", "message": str(e)}) from e
 
 
 def _save_index(path: Path, data: dict) -> None:
     try:
         path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail={"code": "internal_error", "message": str(e)}) from e
 
 
 def _now_iso() -> str:
@@ -74,7 +74,7 @@ def _now_iso() -> str:
 @router.get("/api/rag/documents")
 async def list_documents(http_request: Request):
     if not feature_enabled("indexing"):
-        raise HTTPException(status_code=403, detail="Indexing is disabled")
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Indexing is disabled"})
     user = await require_user_from_request(http_request)
     user_id = str(user.get("id") or "")
     idx_path = _index_path(user_id)
@@ -99,13 +99,13 @@ async def list_documents(http_request: Request):
 @router.post("/api/rag/documents/upload")
 async def upload_document(file: UploadFile, http_request: Request):
     if not feature_enabled("indexing"):
-        raise HTTPException(status_code=403, detail="Indexing is disabled")
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Indexing is disabled"})
     user = await require_user_from_request(http_request)
     user_id = str(user.get("id") or "")
 
     data = await file.read()
     if not data:
-        raise HTTPException(status_code=400, detail="Empty file")
+        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "Empty file"})
 
     name = (file.filename or "document").strip()
     if len(name) > 200:
@@ -117,12 +117,12 @@ async def upload_document(file: UploadFile, http_request: Request):
         try:
             text = data.decode("latin-1")
         except Exception as e:
-            raise HTTPException(status_code=400, detail="Unsupported encoding") from e
+            raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "Unsupported encoding"}) from e
 
     doc_id = str(uuid.uuid4())
     chunks = _chunk_text(text)
     if not chunks:
-        raise HTTPException(status_code=400, detail="No indexable text found")
+        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "No indexable text found"})
 
     rag_root = _rag_dir(user_id)
     doc_path = rag_root / f"{doc_id}.txt"
@@ -152,7 +152,7 @@ async def upload_document(file: UploadFile, http_request: Request):
 @router.delete("/api/rag/documents/{doc_id}")
 async def delete_document(doc_id: str, http_request: Request):
     if not feature_enabled("indexing"):
-        raise HTTPException(status_code=403, detail="Indexing is disabled")
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Indexing is disabled"})
     user = await require_user_from_request(http_request)
     user_id = str(user.get("id") or "")
 
@@ -193,13 +193,13 @@ class SearchRequest(BaseModel):
 @router.post("/api/rag/search")
 async def search(request: SearchRequest, http_request: Request):
     if not feature_enabled("indexing"):
-        raise HTTPException(status_code=403, detail="Indexing is disabled")
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Indexing is disabled"})
     user = await require_user_from_request(http_request)
     user_id = str(user.get("id") or "")
 
     q = (request.query or "").strip()
     if not q:
-        raise HTTPException(status_code=400, detail="Missing query")
+        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "Missing query"})
 
     idx_path = _index_path(user_id)
     idx = _load_index(idx_path)
@@ -207,7 +207,7 @@ async def search(request: SearchRequest, http_request: Request):
 
     terms = [t for t in re.split(r"\\W+", q.lower()) if t]
     if not terms:
-        raise HTTPException(status_code=400, detail="Invalid query")
+        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "Invalid query"})
 
     results = []
     for d in docs:
@@ -247,4 +247,3 @@ async def search(request: SearchRequest, http_request: Request):
     results.sort(key=lambda r: int(r.get("score") or 0), reverse=True)
     limit = max(1, min(int(request.limit or 8), 25))
     return {"results": results[:limit]}
-

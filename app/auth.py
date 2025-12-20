@@ -16,7 +16,7 @@ async def verify_supabase_access_token(access_token: str) -> dict[str, Any]:
     """
     access_token = (access_token or "").strip()
     if not access_token:
-        raise HTTPException(status_code=401, detail="Missing access token")
+        raise HTTPException(status_code=401, detail={"code": "missing_token", "message": "Missing access token"})
 
     now = time.time()
     cached = _SUPABASE_TOKEN_CACHE.get(access_token)
@@ -26,7 +26,10 @@ async def verify_supabase_access_token(access_token: str) -> dict[str, Any]:
     supabase_url = os.environ.get("SUPABASE_URL")
     supabase_key = os.environ.get("SUPABASE_KEY")
     if not supabase_url or not supabase_key:
-        raise HTTPException(status_code=503, detail="Supabase is not configured")
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "supabase_not_configured", "message": "Supabase is not configured"},
+        )
 
     import httpx
 
@@ -35,7 +38,7 @@ async def verify_supabase_access_token(access_token: str) -> dict[str, Any]:
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.get(url, headers=headers)
         if resp.status_code != 200:
-            raise HTTPException(status_code=401, detail="Invalid or expired session")
+            raise HTTPException(status_code=401, detail={"code": "invalid_session", "message": "Invalid or expired session"})
 
         user = resp.json()
         _SUPABASE_TOKEN_CACHE[access_token] = (now, user)
@@ -50,7 +53,9 @@ async def verify_supabase_access_token(access_token: str) -> dict[str, Any]:
 async def require_user_from_request(request: Request) -> dict[str, Any]:
     auth = (request.headers.get("authorization") or "").strip()
     if not auth.lower().startswith("bearer "):
-        raise HTTPException(status_code=401, detail="Missing Authorization bearer token")
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "missing_bearer_token", "message": "Missing Authorization bearer token"},
+        )
     token = auth.split(None, 1)[1].strip()
     return await verify_supabase_access_token(token)
-

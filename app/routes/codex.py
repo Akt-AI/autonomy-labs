@@ -5,7 +5,6 @@ import json
 import os
 import uuid
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -51,9 +50,9 @@ def _with_codex_agent_prefix(message: str) -> str:
 @router.post("/api/codex/cli")
 async def codex_agent_cli(request: CodexRequest, http_request: Request):
     if not request.message.strip():
-        raise HTTPException(status_code=400, detail="Message is required")
+        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "Message is required"})
     if not feature_enabled("codex"):
-        raise HTTPException(status_code=403, detail="Codex is disabled")
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Codex is disabled"})
 
     user = await require_user_from_request(http_request)
     message = _with_codex_agent_prefix(request.message)
@@ -91,8 +90,8 @@ async def codex_agent_cli(request: CodexRequest, http_request: Request):
             out_text = (stdout.decode("utf-8", errors="ignore") or "").strip()
             detail = err_text or out_text or "Codex CLI failed"
             if "401 Unauthorized" in detail or "status 401" in detail:
-                raise HTTPException(status_code=401, detail=detail)
-            raise HTTPException(status_code=500, detail=detail)
+                raise HTTPException(status_code=401, detail={"code": "unauthorized", "message": detail})
+            raise HTTPException(status_code=500, detail={"code": "codex_error", "message": detail})
 
         thread_id = None
         final_text = ""
@@ -118,32 +117,32 @@ async def codex_agent_cli(request: CodexRequest, http_request: Request):
             if event.get("type") == "turn.failed":
                 err = (event.get("error") or {}).get("message") or "Codex turn failed"
                 if "401" in err:
-                    raise HTTPException(status_code=401, detail=err)
-                raise HTTPException(status_code=500, detail=err)
+                    raise HTTPException(status_code=401, detail={"code": "unauthorized", "message": err})
+                raise HTTPException(status_code=500, detail={"code": "codex_error", "message": err})
 
         if not saw_event and err_text:
             if "401 Unauthorized" in err_text or "status 401" in err_text:
-                raise HTTPException(status_code=401, detail=err_text)
+                raise HTTPException(status_code=401, detail={"code": "unauthorized", "message": err_text})
             if "Error:" in err_text or "Fatal error" in err_text:
-                raise HTTPException(status_code=500, detail=err_text)
+                raise HTTPException(status_code=500, detail={"code": "codex_error", "message": err_text})
         if not saw_event and not final_text:
             out_text = (stdout.decode("utf-8", errors="ignore") or "").strip()
             if out_text:
-                raise HTTPException(status_code=500, detail=out_text)
+                raise HTTPException(status_code=500, detail={"code": "codex_error", "message": out_text})
 
         return {"threadId": thread_id or request.threadId, "finalResponse": final_text, "usage": usage}
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail={"code": "internal_error", "message": str(e)}) from e
 
 
 @router.post("/api/codex/cli/stream")
 async def codex_agent_cli_stream(request: CodexRequest, http_request: Request):
     if not request.message.strip():
-        raise HTTPException(status_code=400, detail="Message is required")
+        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "Message is required"})
     if not feature_enabled("codex"):
-        raise HTTPException(status_code=403, detail="Codex is disabled")
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Codex is disabled"})
 
     user = await require_user_from_request(http_request)
     message = _with_codex_agent_prefix(request.message)
@@ -263,7 +262,7 @@ async def codex_agent_cli_stream(request: CodexRequest, http_request: Request):
 @router.get("/api/codex/mcp")
 async def codex_mcp_list(http_request: Request):
     if not feature_enabled("mcp"):
-        raise HTTPException(status_code=403, detail="MCP is disabled")
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "MCP is disabled"})
     _ = await require_user_from_request(http_request)
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -290,7 +289,7 @@ async def codex_mcp_list(http_request: Request):
 @router.get("/api/codex/mcp/details")
 async def codex_mcp_details(http_request: Request):
     if not feature_enabled("mcp"):
-        raise HTTPException(status_code=403, detail="MCP is disabled")
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "MCP is disabled"})
     _ = await require_user_from_request(http_request)
     try:
         servers_resp = await codex_mcp_list(http_request)
@@ -321,7 +320,7 @@ async def codex_mcp_details(http_request: Request):
 @router.get("/api/codex/login/status")
 async def codex_login_status(http_request: Request):
     if not feature_enabled("codex"):
-        raise HTTPException(status_code=403, detail="Codex is disabled")
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Codex is disabled"})
     _ = await require_user_from_request(http_request)
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -379,7 +378,7 @@ async def _read_device_login_output(attempt: DeviceLoginAttempt) -> None:
 @router.post("/api/codex/login/device/start")
 async def codex_login_device_start(http_request: Request):
     if not feature_enabled("codex"):
-        raise HTTPException(status_code=403, detail="Codex is disabled")
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Codex is disabled"})
     _ = await require_user_from_request(http_request)
     async with http_request.app.state.device_login_lock:
         proc = await asyncio.create_subprocess_exec(
@@ -403,11 +402,11 @@ async def codex_login_device_start(http_request: Request):
 @router.get("/api/codex/login/device/status")
 async def codex_login_device_status(loginId: str, http_request: Request):
     if not feature_enabled("codex"):
-        raise HTTPException(status_code=403, detail="Codex is disabled")
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Codex is disabled"})
     _ = await require_user_from_request(http_request)
     attempt = http_request.app.state.device_login_attempts.get(loginId)
     if not attempt:
-        raise HTTPException(status_code=404, detail="Unknown loginId")
+        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Unknown loginId"})
 
     tail = attempt.output[-50:]
     status = "pending"

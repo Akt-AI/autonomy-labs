@@ -40,12 +40,12 @@ async def read_app():
 
 @router.get("/settings")
 async def read_settings():
-    return FileResponse(str(_STATIC / "dashboard.html"))
+    return FileResponse(str(_STATIC / "settings.html"))
 
 
 @router.get("/admin")
 async def read_admin():
-    return FileResponse(str(_STATIC / "dashboard.html"))
+    return FileResponse(str(_STATIC / "admin.html"))
 
 
 @router.get("/health")

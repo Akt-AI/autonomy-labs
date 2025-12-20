@@ -30,7 +30,7 @@ def _templates_path() -> Path:
 
 def _require_admin(user: dict[str, Any]) -> None:
     if not _is_admin(user):
-        raise HTTPException(status_code=403, detail="Admin privileges required")
+        raise HTTPException(status_code=403, detail={"code": "admin_required", "message": "Admin privileges required"})
 
 
 class McpTemplates(BaseModel):
@@ -48,7 +48,7 @@ async def get_mcp_templates(http_request: Request):
     except FileNotFoundError:
         return {"version": 1, "templates": []}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail={"code": "internal_error", "message": str(e)}) from e
 
 
 @router.put("/api/admin/mcp-templates")
@@ -73,4 +73,4 @@ async def put_mcp_templates(body: McpTemplates, http_request: Request):
         path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         return {"ok": True, "count": len(templates)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail={"code": "internal_error", "message": str(e)}) from e

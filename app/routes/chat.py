@@ -30,7 +30,7 @@ async def chat_endpoint(request: ChatRequest):
     base_url = request.baseUrl or os.environ.get("OPENAI_BASE_URL")
 
     if not api_key:
-        raise HTTPException(status_code=400, detail="API Key is required")
+        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "API Key is required"})
 
     client = OpenAI(api_key=api_key, base_url=base_url)
 
@@ -61,7 +61,7 @@ async def proxy_models(request: ModelsRequest):
     base_url = request.baseUrl or os.environ.get("OPENAI_BASE_URL")
 
     if not base_url:
-        raise HTTPException(status_code=400, detail="Base URL is required")
+        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "Base URL is required"})
 
     try:
         import httpx
@@ -75,9 +75,16 @@ async def proxy_models(request: ModelsRequest):
         async with httpx.AsyncClient() as client:
             resp = await client.get(target_url, headers=headers, timeout=10.0)
             if resp.status_code != 200:
-                raise HTTPException(status_code=resp.status_code, detail=f"Provider returned error: {resp.text}")
+                raise HTTPException(
+                    status_code=resp.status_code,
+                    detail={
+                        "code": "provider_error",
+                        "message": "Provider returned error",
+                        "details": {"status": resp.status_code, "body": resp.text[:4000]},
+                    },
+                )
             return resp.json()
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail={"code": "internal_error", "message": str(e)}) from e

@@ -5,9 +5,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.errors import normalize_error
 from app.mcp_client import McpStdioClient
 from app.routes.admin import router as admin_router
 from app.routes.base import router as base_router
@@ -59,6 +63,22 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(lifespan=lifespan)
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _http_exception_handler(_request, exc: StarletteHTTPException):
+        err = normalize_error(exc.detail, status_code=exc.status_code)
+        # Keep `detail` for backward compatibility with existing UI; add structured `error`.
+        return JSONResponse(status_code=exc.status_code, content={"detail": err["message"], "error": err})
+
+    @app.exception_handler(RequestValidationError)
+    async def _validation_exception_handler(_request, exc: RequestValidationError):
+        err = normalize_error(exc.errors(), status_code=422, default_code="validation_error")
+        return JSONResponse(status_code=422, content={"detail": err["message"], "error": err})
+
+    @app.exception_handler(Exception)
+    async def _unhandled_exception_handler(_request, exc: Exception):
+        err = normalize_error(str(exc), status_code=500, default_code="internal_error")
+        return JSONResponse(status_code=500, content={"detail": err["message"], "error": err})
 
     app.add_middleware(
         CORSMiddleware,

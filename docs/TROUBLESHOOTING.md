@@ -38,6 +38,11 @@ The Settings → MCP “Test” button runs from your browser, so it is subject 
 Also note:
 - `mcp.json` import only accepts `http://` / `https://` URLs.
 
+## API errors are shown as JSON
+
+The backend returns a consistent error payload like:
+`{"detail":"...","error":{"code":"...","message":"...","status":...,"details":...}}`.
+
 ## PTY allocation failed
 
 If the backend prints `PTY allocation failed`, the runtime likely lacks `/dev/pts` or has exhausted PTYs.

@@ -788,6 +788,16 @@ let supabase;
                 // Route helpers
                 if (location.pathname === '/settings') openSettings();
                 if (location.pathname === '/admin') openAdmin();
+                try {
+                    if (sessionStorage.getItem('open_settings_on_load_v1') === '1') {
+                        sessionStorage.removeItem('open_settings_on_load_v1');
+                        openSettings();
+                    }
+                    if (sessionStorage.getItem('open_admin_on_load_v1') === '1') {
+                        sessionStorage.removeItem('open_admin_on_load_v1');
+                        openAdmin();
+                    }
+                } catch { }
 
             } catch (error) { console.error(error); }
         }
