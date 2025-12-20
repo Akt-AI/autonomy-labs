@@ -1,4 +1,5 @@
 var supabase = window.__supabaseClient || null;
+var supabaseReady = false;
 
         function isSignupAllowed() {
             const setting = localStorage.getItem('auth_allow_signup_v1');
@@ -7,6 +8,28 @@ var supabase = window.__supabaseClient || null;
                 return true;
             }
             return setting === '1';
+        }
+
+        function setAuthControlsEnabled(enabled) {
+            const inputs = [
+                document.getElementById('email'),
+                document.getElementById('password'),
+                document.getElementById('reset-email'),
+                document.getElementById('new-password'),
+                document.getElementById('confirm-password'),
+            ];
+            const buttons = [
+                document.getElementById('login-btn'),
+                document.getElementById('register-btn'),
+                document.getElementById('send-reset-btn'),
+                document.getElementById('update-password-btn'),
+            ];
+            for (const el of inputs) {
+                if (el) el.disabled = !enabled;
+            }
+            for (const btn of buttons) {
+                if (btn) btn.disabled = !enabled;
+            }
         }
 
         function parseUrlParams() {
@@ -44,6 +67,12 @@ var supabase = window.__supabaseClient || null;
             throw lastError || new Error('Config fetch failed');
         }
 
+        function requireSupabaseLibrary() {
+            if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+                throw new Error('Supabase client library failed to load. Check CDN access or content blockers.');
+            }
+        }
+
         function isRecoveryUrl() {
             const { search, hash } = parseUrlParams();
             const type = String(hash.get('type') || search.get('type') || '').toLowerCase();
@@ -79,12 +108,16 @@ var supabase = window.__supabaseClient || null;
 
         async function initSupabase() {
             try {
+                setAuthControlsEnabled(false);
                 const config = await fetchConfig();
                 if (!config.supabase_url || !config.supabase_key) {
-                    throw new Error('Supabase configuration missing');
+                    throw new Error('Supabase configuration missing (supabase_url/supabase_key).');
                 }
+                requireSupabaseLibrary();
                 supabase = window.__supabaseClient || window.supabase.createClient(config.supabase_url, config.supabase_key);
                 window.__supabaseClient = supabase;
+                supabaseReady = true;
+                setAuthControlsEnabled(true);
 
                 // Register toggle (defaults to allowed unless explicitly disabled).
                 const allowSignup = isSignupAllowed();
@@ -127,7 +160,9 @@ var supabase = window.__supabaseClient || null;
                 }
             } catch (error) {
                 console.error('Error initializing Supabase:', error);
-                showAlert('Error initializing application configuration', 'error');
+                const msg = error?.message || String(error);
+                showAlert(`Error initializing application configuration: ${msg}`, 'error');
+                setAuthControlsEnabled(false);
             }
         }
 
@@ -181,8 +216,8 @@ var supabase = window.__supabaseClient || null;
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
 
-            if (!supabase) {
-                showAlert('Supabase not initialized');
+            if (!supabase || !supabaseReady) {
+                showAlert('Supabase not initialized. Please refresh and try again.');
                 return;
             }
 

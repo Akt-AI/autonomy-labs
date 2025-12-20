@@ -325,6 +325,12 @@ let supabase;
             if (el) el.checked = !!enabled;
         }
 
+        function requireSupabaseLibrary() {
+            if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+                throw new Error('Supabase client library failed to load. Check CDN access or content blockers.');
+            }
+        }
+
         function configEndpoint(path) {
             const base = new URL('.', window.location.href);
             const cleaned = String(path || '').replace(/^\/+/, '');
@@ -1016,7 +1022,9 @@ let supabase;
             try {
                 const config = await fetchConfig();
                 if (!config.supabase_url || !config.supabase_key) throw new Error('Supabase Config Missing');
-                supabase = window.supabase.createClient(config.supabase_url, config.supabase_key);
+                requireSupabaseLibrary();
+                supabase = window.__supabaseClient || window.supabase.createClient(config.supabase_url, config.supabase_key);
+                window.__supabaseClient = supabase;
 
                 const { data: { session } } = await supabase.auth.getSession();
                 if (!session) { window.location.href = '/login'; return; }
@@ -1278,7 +1286,11 @@ let supabase;
                     }
                 } catch { }
 
-            } catch (error) { console.error(error); }
+            } catch (error) {
+                console.error(error);
+                const msg = error?.message || String(error);
+                alert(`Failed to initialize app: ${msg}`);
+            }
         }
 
         // --- View Switching ---
