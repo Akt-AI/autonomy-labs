@@ -369,6 +369,113 @@ let supabase;
             if (status && !enabled) status.textContent = 'Enable indexing with ENABLE_INDEXING=1 and restart.';
         }
 
+        function setIndexingStatus(text) {
+            const el = document.getElementById('indexing-status');
+            if (el) el.textContent = text || '';
+        }
+
+        function renderIndexingJobs(jobs) {
+            const el = document.getElementById('indexing-jobs');
+            if (!el) return;
+            el.innerHTML = '';
+            const list = Array.isArray(jobs) ? jobs : [];
+            if (!list.length) {
+                const empty = document.createElement('div');
+                empty.className = 'text-xs text-gray-500';
+                empty.textContent = 'No indexing jobs yet.';
+                el.appendChild(empty);
+                return;
+            }
+
+            for (const j of list.slice(0, 30)) {
+                const row = document.createElement('div');
+                row.className = 'bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2 flex items-start justify-between gap-3';
+
+                const left = document.createElement('div');
+                left.className = 'min-w-0';
+                const title = document.createElement('div');
+                title.className = 'text-sm text-gray-100 truncate';
+                title.textContent = `${j?.type || 'job'} • ${j?.status || 'unknown'}`;
+                const meta = document.createElement('div');
+                meta.className = 'text-xs text-gray-500 mt-0.5';
+                const p = j?.progress || {};
+                const visited = p?.visited ?? 0;
+                const indexed = p?.indexedPages ?? 0;
+                meta.textContent = `${j?.createdAt || ''} • visited ${visited} • indexed ${indexed}`;
+                left.appendChild(title);
+                left.appendChild(meta);
+
+                const right = document.createElement('div');
+                right.className = 'shrink-0 flex gap-2';
+                if (j?.status === 'running' || j?.status === 'queued') {
+                    const btn = document.createElement('button');
+                    btn.className = 'bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs';
+                    btn.textContent = 'Cancel';
+                    btn.onclick = () => cancelIndexingJob(String(j?.id || ''));
+                    right.appendChild(btn);
+                }
+
+                row.appendChild(left);
+                row.appendChild(right);
+                el.appendChild(row);
+            }
+        }
+
+        async function loadIndexingJobs() {
+            try {
+                setIndexingStatus('Loading jobs...');
+                const res = await authFetch('/api/indexing/jobs');
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                renderIndexingJobs(data?.jobs || []);
+                setIndexingStatus('');
+            } catch (e) {
+                setIndexingStatus(`Failed to load jobs: ${e?.message || e}`);
+            }
+        }
+
+        async function startWebCrawlJob() {
+            const url = (document.getElementById('crawl-url')?.value || '').trim();
+            const maxPages = Number(document.getElementById('crawl-max-pages')?.value || 25);
+            const maxDepth = Number(document.getElementById('crawl-max-depth')?.value || 2);
+            const rateLimitSec = Number(document.getElementById('crawl-rate')?.value || 0.25);
+            const respectRobots = !!document.getElementById('crawl-respect-robots')?.checked;
+            if (!url) {
+                setIndexingStatus('Enter a URL.');
+                return;
+            }
+            try {
+                setIndexingStatus('Starting job...');
+                const res = await authFetch('/api/indexing/jobs/web-crawl', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, maxPages, maxDepth, rateLimitSec, respectRobots }),
+                });
+                if (!res.ok) throw new Error(await res.text());
+                await res.json();
+                setIndexingStatus('Job started.');
+                loadIndexingJobs();
+            } catch (e) {
+                setIndexingStatus(`Failed to start job: ${e?.message || e}`);
+            }
+        }
+
+        async function cancelIndexingJob(jobId) {
+            const id = (jobId || '').trim();
+            if (!id) return;
+            if (!confirm('Cancel this job?')) return;
+            try {
+                setIndexingStatus('Canceling...');
+                const res = await authFetch(`/api/indexing/jobs/${encodeURIComponent(id)}/cancel`, { method: 'POST' });
+                if (!res.ok) throw new Error(await res.text());
+                await res.json();
+                setIndexingStatus('Canceled.');
+                loadIndexingJobs();
+            } catch (e) {
+                setIndexingStatus(`Failed to cancel: ${e?.message || e}`);
+            }
+        }
+
         function setRagStatus(text) {
             const el = document.getElementById('rag-status');
             if (el) el.textContent = text || '';
@@ -595,6 +702,7 @@ let supabase;
                 applyIndexingUi(me);
                 if (me?.features?.indexing) {
                     loadRagDocuments();
+                    loadIndexingJobs();
                 }
 
                 // Chat sidebar collapse preference (desktop)

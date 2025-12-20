@@ -29,6 +29,11 @@ This repo prefers env-based auth for provider CLIs (keep tokens out of git and U
 
 Set `ENABLE_INDEXING=1` in your environment and restart the container.
 
+## Website indexing fails (“Host is not allowed”)
+
+Website indexing blocks private/localhost targets to reduce SSRF risk.
+Use a public `http(s)` URL and keep indexing within the same origin.
+
 ## Terminal shows vertical/1-column text
 
 This usually means the terminal “fit” ran while the terminal view was hidden or at size 0.

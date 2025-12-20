@@ -51,9 +51,9 @@ Legend:
 ## P3 — RAG + indexing (docs/web/GitHub) + “password manager”
 - [x] Clarify “password manager” scope and threat model (`docs/PASSWORD_MANAGER_SCOPE.md`).
 - [x] Document upload indexing connector (MVP: text-only, keyword search).
-- [ ] Website crawler indexing (depth/allowlist/robots/rate limits).
+- [~] Website crawler indexing (MVP: same-origin crawl with depth/pages, basic robots, private-host blocking).
 - [ ] GitHub repo indexing connector (branch/path filters + token support).
-- [ ] Jobs UI (progress/retries/errors/access controls).
+- [~] Jobs UI (MVP: start/cancel/list crawl jobs).
 
 ## P3 — P2P pubsub chat + account manager
 - [ ] Account manager: identities/devices, memberships, permissions, moderation.

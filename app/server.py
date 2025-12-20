@@ -12,11 +12,13 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.errors import normalize_error
+from app.indexing_jobs import IndexJobStore
 from app.mcp_client import McpStdioClient
 from app.routes.admin import router as admin_router
 from app.routes.base import router as base_router
 from app.routes.chat import router as chat_router
 from app.routes.codex import router as codex_router
+from app.routes.indexing import router as indexing_router
 from app.routes.mcp import router as mcp_router
 from app.routes.rag import router as rag_router
 from app.routes.terminal import router as terminal_router
@@ -28,6 +30,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.codex_mcp_client = McpStdioClient(["codex", "mcp-server"])
+    app.state.index_job_store = IndexJobStore()
     app.state.device_login_attempts = {}
     app.state.device_login_lock = asyncio.Lock()
     stop = asyncio.Event()
@@ -94,6 +97,7 @@ def create_app() -> FastAPI:
     app.include_router(base_router)
     app.include_router(chat_router)
     app.include_router(codex_router)
+    app.include_router(indexing_router)
     app.include_router(mcp_router)
     app.include_router(terminal_router)
     app.include_router(user_router)
