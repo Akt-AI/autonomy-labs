@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.auth import require_user_from_request
+from app.codex_runs import CodexRunStore
 from app.settings import feature_enabled
 from app.workdir import safe_user_workdir
 
@@ -257,6 +258,110 @@ async def codex_agent_cli_stream(request: CodexRequest, http_request: Request):
                 yield b
 
     return StreamingResponse(gen(), media_type="application/x-ndjson")
+
+
+@router.post("/api/codex/cli/run")
+async def codex_cli_run_start(request: CodexRequest, http_request: Request):
+    if not request.message.strip():
+        raise HTTPException(status_code=400, detail={"code": "invalid_request", "message": "Message is required"})
+    if not feature_enabled("codex"):
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Codex is disabled"})
+
+    user = await require_user_from_request(http_request)
+    user_id = str(user.get("id") or "")
+    message = _with_codex_agent_prefix(request.message)
+
+    base_args = ["codex", "exec", "--json", "--color", "never", "--sandbox", request.sandboxMode or "workspace-write"]
+    if request.approvalPolicy:
+        base_args += ["--config", f'approval_policy="{request.approvalPolicy}"']
+    if request.model:
+        base_args += ["--model", request.model]
+    base_args += ["--cd", safe_user_workdir(user, request.workingDirectory), "--skip-git-repo-check"]
+    if request.threadId:
+        base_args += ["resume", request.threadId, message]
+    else:
+        base_args += [message]
+
+    env = os.environ.copy()
+    if request.apiKey:
+        env["OPENAI_API_KEY"] = request.apiKey
+        env["CODEX_API_KEY"] = request.apiKey
+        if request.baseUrl:
+            env["OPENAI_BASE_URL"] = request.baseUrl
+
+    store: CodexRunStore = http_request.app.state.codex_run_store
+    run = await store.create_run(user_id=user_id, args=base_args, env=env)
+    return {"ok": True, "runId": run.id, "cursor": run.start_cursor()}
+
+
+@router.get("/api/codex/cli/run/{run_id}")
+async def codex_cli_run_status(run_id: str, http_request: Request):
+    if not feature_enabled("codex"):
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Codex is disabled"})
+    user = await require_user_from_request(http_request)
+    user_id = str(user.get("id") or "")
+    store: CodexRunStore = http_request.app.state.codex_run_store
+    run = await store.get_run(run_id)
+    if not run or run.user_id != user_id:
+        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Unknown runId"})
+    return {
+        "ok": True,
+        "runId": run.id,
+        "done": run.done,
+        "returnCode": run.returncode,
+        "threadId": run.thread_id,
+        "finalResponse": run.final_text,
+        "usage": run.usage,
+        "startCursor": run.start_cursor(),
+        "endCursor": run.end_cursor(),
+    }
+
+
+@router.get("/api/codex/cli/run/{run_id}/stream")
+async def codex_cli_run_stream(run_id: str, http_request: Request, cursor: int = 0):
+    if not feature_enabled("codex"):
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Codex is disabled"})
+    user = await require_user_from_request(http_request)
+    user_id = str(user.get("id") or "")
+    store: CodexRunStore = http_request.app.state.codex_run_store
+    run = await store.get_run(run_id)
+    if not run or run.user_id != user_id:
+        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Unknown runId"})
+
+    async def gen():
+        cur = int(cursor or 0)
+        # If the cursor is too old, inform the client once.
+        if cur < run.start_cursor():
+            meta = {"type": "meta", "message": "cursor_too_old", "startCursor": run.start_cursor()}
+            yield (json.dumps(meta, ensure_ascii=False) + "\n").encode("utf-8")
+            cur = run.start_cursor()
+
+        while True:
+            cur, lines = await run.snapshot_from(cur)
+            for line in lines:
+                yield (line + "\n").encode("utf-8")
+                cur += 1
+
+            if run.done and run.end_cursor() <= cur:
+                break
+            await run.wait_for_new(cur, timeout=20.0)
+            # Keepalive to reduce proxy idle disconnects; client ignores blank lines.
+            yield b"\n"
+
+    return StreamingResponse(gen(), media_type="application/x-ndjson")
+
+
+@router.post("/api/codex/cli/run/{run_id}/cancel")
+async def codex_cli_run_cancel(run_id: str, http_request: Request):
+    if not feature_enabled("codex"):
+        raise HTTPException(status_code=403, detail={"code": "feature_disabled", "message": "Codex is disabled"})
+    user = await require_user_from_request(http_request)
+    user_id = str(user.get("id") or "")
+    store: CodexRunStore = http_request.app.state.codex_run_store
+    ok = await store.cancel_run(run_id, user_id=user_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail={"code": "not_found", "message": "Unknown runId"})
+    return {"ok": True, "canceled": True}
 
 
 @router.get("/api/codex/mcp")

@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.codex_runs import CodexRunStore
 from app.errors import normalize_error
 from app.indexing_jobs import IndexJobStore
 from app.mcp_client import McpStdioClient
@@ -30,6 +31,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.codex_mcp_client = McpStdioClient(["codex", "mcp-server"])
+    app.state.codex_run_store = CodexRunStore()
     app.state.index_job_store = IndexJobStore()
     app.state.device_login_attempts = {}
     app.state.device_login_lock = asyncio.Lock()
@@ -52,12 +54,22 @@ async def lifespan(app: FastAPI):
             except Exception:
                 continue
 
+    async def _cleanup_codex_runs():
+        while not stop.is_set():
+            await asyncio.sleep(60)
+            try:
+                await app.state.codex_run_store.prune()
+            except Exception:
+                continue
+
     cleanup_task = asyncio.create_task(_cleanup_device_logins())
+    cleanup_runs_task = asyncio.create_task(_cleanup_codex_runs())
     try:
         yield
     finally:
         stop.set()
         cleanup_task.cancel()
+        cleanup_runs_task.cancel()
         try:
             await app.state.codex_mcp_client.close()
         except Exception:

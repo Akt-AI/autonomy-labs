@@ -1418,12 +1418,16 @@ let supabase;
         let currentSessionId = null;
         let chatAbortController = null;
         let agentAbortController = null;
+        let activeCodexRunId = null;
+        let activeAgentCodexRunId = null;
         let chatImageAttachments = []; // [{ dataUrl, mime }]
         let agentImageAttachments = []; // [{ dataUrl, mime }]
         let chatRecognition = null;
         let agentRecognition = null;
         let chatDictating = false;
         let agentDictating = false;
+
+        const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
         function setChatGenerating(isGenerating) {
             const btn = document.getElementById('chat-stop-btn');
@@ -1971,20 +1975,28 @@ let supabase;
             aiMsgEl.innerHTML = '';
 
             try {
-                const res = await authFetch('/api/codex/cli/stream', {
+                if (chatAbortController) chatAbortController.abort();
+                chatAbortController = new AbortController();
+                setChatGenerating(true);
+
+                const payload = {
+                    message,
+                    threadId: getCodexThreadId() || null,
+                    model: model || null,
+                    sandboxMode,
+                    approvalPolicy: 'never',
+                    modelReasoningEffort: 'minimal',
+                    workingDirectory: getCodexWorkdir() || null,
+                    apiKey: apiKey || null,
+                    baseUrl: baseUrl || null
+                };
+
+                // Start a resumable run.
+                const res = await authFetch('/api/codex/cli/run', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message,
-                        threadId: getCodexThreadId() || null,
-                        model: model || null,
-                        sandboxMode,
-                        approvalPolicy: 'never',
-                        modelReasoningEffort: 'minimal',
-                        workingDirectory: getCodexWorkdir() || null,
-                        apiKey: apiKey || null,
-                        baseUrl: baseUrl || null
-                    })
+                    body: JSON.stringify(payload),
+                    signal: chatAbortController.signal,
                 });
                 if (!res.ok) {
                     const txt = await res.text();
@@ -2013,8 +2025,22 @@ let supabase;
                     throw new Error(txt || `HTTP ${res.status}`);
                 }
 
-                const reader = res.body.getReader();
+                const started = await res.json();
+                const runId = started?.runId;
+                if (!runId) throw new Error('Missing runId from server');
+                activeCodexRunId = runId;
+                chatAbortController.signal.addEventListener(
+                    'abort',
+                    () => {
+                        const id = activeCodexRunId;
+                        if (!id) return;
+                        authFetch(`/api/codex/cli/run/${encodeURIComponent(id)}/cancel`, { method: 'POST' }).catch(() => { });
+                    },
+                    { once: true }
+                );
+
                 const decoder = new TextDecoder();
+                let cursor = Number(started?.cursor || 0);
                 let buffer = '';
                 let finalText = '';
                 let threadId = null;
@@ -2053,35 +2079,75 @@ let supabase;
                     scrollToBottom();
                 };
 
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop() || '';
-                    for (const line of lines) {
-                        if (!line.trim()) continue;
-                        let evt;
-                        try { evt = JSON.parse(line); } catch { continue; }
-                        pushProgress(summarizeEvent(evt));
-                        if (showJsonl) pushProgress(JSON.stringify(evt));
-                        if (evt.type === 'thread.started' && evt.thread_id) {
-                            threadId = evt.thread_id;
-                            setCodexThreadId(threadId);
-                        } else if (evt.type === 'item.completed' && evt.item?.type === 'agent_message') {
-                            finalText = evt.item.text || finalText;
-                        } else if (evt.type === 'done') {
-                            if (evt.threadId) setCodexThreadId(evt.threadId);
-                            if (evt.finalResponse) finalText = evt.finalResponse;
+                const streamOnce = async () => {
+                    const url = `/api/codex/cli/run/${encodeURIComponent(runId)}/stream?cursor=${encodeURIComponent(cursor)}`;
+                    const sres = await authFetch(url, { signal: chatAbortController.signal });
+                    if (!sres.ok) throw new Error(await sres.text());
+                    const reader = sres.body.getReader();
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        buffer += decoder.decode(value, { stream: true });
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+                        for (const line of lines) {
+                            if (!line.trim()) continue;
+                            let evt;
+                            try { evt = JSON.parse(line); } catch { continue; }
+                            if (evt?.type === 'meta' && evt?.message === 'cursor_too_old' && evt?.startCursor != null) {
+                                cursor = Number(evt.startCursor) || cursor;
+                                continue;
+                            }
+                            cursor += 1;
+                            pushProgress(summarizeEvent(evt));
+                            if (showJsonl) pushProgress(JSON.stringify(evt));
+                            if (evt.type === 'thread.started' && evt.thread_id) {
+                                threadId = evt.thread_id;
+                                setCodexThreadId(threadId);
+                            } else if (evt.type === 'item.completed' && evt.item?.type === 'agent_message') {
+                                finalText = evt.item.text || finalText;
+                            } else if (evt.type === 'done') {
+                                if (evt.threadId) setCodexThreadId(evt.threadId);
+                                if (evt.finalResponse) finalText = evt.finalResponse;
+                                return true;
+                            }
+                            renderProgress();
                         }
+                    }
+                    return false;
+                };
+
+                let done = false;
+                let attempts = 0;
+                while (!done) {
+                    try {
+                        done = await streamOnce();
+                        attempts = 0;
+                    } catch (e) {
+                        if (chatAbortController.signal.aborted) throw e;
+                        attempts += 1;
+                        if (attempts > 3) throw e;
+                        pushProgress(`reconnecting... (${attempts})`);
                         renderProgress();
+                        await sleep(400 * attempts);
                     }
                 }
 
                 // Final render (in case only done event carried finalResponse)
                 renderMarkdownInto(aiMsgEl, finalText || (progress.length ? progress.slice(-30).join('\n') : ''));
             } catch (e) {
-                aiMsgEl.textContent = `Error: ${e?.message || e}`;
+                if (e?.name === 'AbortError') {
+                    aiMsgEl.textContent = finalText ? finalText : "[stopped]";
+                } else {
+                    aiMsgEl.textContent = `Error: ${e?.message || e}`;
+                }
+            } finally {
+                setChatGenerating(false);
+                if (chatAbortController?.signal?.aborted) {
+                    // keep; abort already happened
+                }
+                chatAbortController = null;
+                activeCodexRunId = null;
             }
         }
 
@@ -2179,7 +2245,7 @@ let supabase;
                     const codexModel = (codex.model || '').trim();
                     const existingThreadId = getAgentCodexThreadId() || null;
 
-                    const res = await authFetch('/api/codex/cli/stream', {
+                    const startRes = await authFetch('/api/codex/cli/run', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -2194,13 +2260,27 @@ let supabase;
                         signal: agentAbortController.signal
                     });
 
-                    if (!res.ok) {
-                        const txt = await res.text();
-                        throw new Error(txt || `HTTP ${res.status}`);
+                    if (!startRes.ok) {
+                        const txt = await startRes.text();
+                        throw new Error(txt || `HTTP ${startRes.status}`);
                     }
 
-                    const reader = res.body.getReader();
+                    const started = await startRes.json();
+                    const runId = started?.runId;
+                    if (!runId) throw new Error('Missing runId from server');
+                    activeAgentCodexRunId = runId;
+                    agentAbortController.signal.addEventListener(
+                        'abort',
+                        () => {
+                            const id = activeAgentCodexRunId;
+                            if (!id) return;
+                            authFetch(`/api/codex/cli/run/${encodeURIComponent(id)}/cancel`, { method: 'POST' }).catch(() => { });
+                        },
+                        { once: true }
+                    );
+
                     const decoder = new TextDecoder();
+                    let cursor = Number(started?.cursor || 0);
                     let buffer = '';
                     let finalText = '';
                     let threadId = existingThreadId;
@@ -2238,33 +2318,62 @@ let supabase;
                         scrollAgentToBottom();
                     };
 
-                    while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        buffer += decoder.decode(value, { stream: true });
-                        const lines = buffer.split('\n');
-                        buffer = lines.pop() || '';
-                        for (const line of lines) {
-                            if (!line.trim()) continue;
-                            let evt;
-                            try { evt = JSON.parse(line); } catch { continue; }
-                            pushProgress(summarizeEvent(evt));
-                            if (evt.type === 'thread.started' && evt.thread_id) {
-                                threadId = evt.thread_id;
-                                setAgentCodexThreadId(threadId);
-                            }
-                            if (evt.type === 'item.updated' && evt.item?.type === 'agent_message' && evt.item?.text) {
-                                finalText = evt.item.text || finalText;
-                            } else if (evt.type === 'item.completed' && evt.item?.type === 'agent_message') {
-                                finalText = evt.item.text || finalText;
-                            } else if (evt.type === 'done') {
-                                if (evt.threadId) {
-                                    threadId = evt.threadId;
+                    const streamOnce = async () => {
+                        const url = `/api/codex/cli/run/${encodeURIComponent(runId)}/stream?cursor=${encodeURIComponent(cursor)}`;
+                        const sres = await authFetch(url, { signal: agentAbortController.signal });
+                        if (!sres.ok) throw new Error(await sres.text());
+                        const reader = sres.body.getReader();
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            buffer += decoder.decode(value, { stream: true });
+                            const lines = buffer.split('\n');
+                            buffer = lines.pop() || '';
+                            for (const line of lines) {
+                                if (!line.trim()) continue;
+                                let evt;
+                                try { evt = JSON.parse(line); } catch { continue; }
+                                if (evt?.type === 'meta' && evt?.message === 'cursor_too_old' && evt?.startCursor != null) {
+                                    cursor = Number(evt.startCursor) || cursor;
+                                    continue;
+                                }
+                                cursor += 1;
+                                pushProgress(summarizeEvent(evt));
+                                if (evt.type === 'thread.started' && evt.thread_id) {
+                                    threadId = evt.thread_id;
                                     setAgentCodexThreadId(threadId);
                                 }
-                                if (evt.finalResponse) finalText = evt.finalResponse;
+                                if (evt.type === 'item.updated' && evt.item?.type === 'agent_message' && evt.item?.text) {
+                                    finalText = evt.item.text || finalText;
+                                } else if (evt.type === 'item.completed' && evt.item?.type === 'agent_message') {
+                                    finalText = evt.item.text || finalText;
+                                } else if (evt.type === 'done') {
+                                    if (evt.threadId) {
+                                        threadId = evt.threadId;
+                                        setAgentCodexThreadId(threadId);
+                                    }
+                                    if (evt.finalResponse) finalText = evt.finalResponse;
+                                    return true;
+                                }
+                                renderProgress();
                             }
+                        }
+                        return false;
+                    };
+
+                    let done = false;
+                    let attempts = 0;
+                    while (!done) {
+                        try {
+                            done = await streamOnce();
+                            attempts = 0;
+                        } catch (e) {
+                            if (agentAbortController.signal.aborted) throw e;
+                            attempts += 1;
+                            if (attempts > 3) throw e;
+                            pushProgress(`reconnecting... (${attempts})`);
                             renderProgress();
+                            await sleep(400 * attempts);
                         }
                     }
 
@@ -2304,6 +2413,7 @@ let supabase;
             } finally {
                 setAgentGenerating(false);
                 agentAbortController = null;
+                activeAgentCodexRunId = null;
             }
         }
 

@@ -38,11 +38,11 @@ Legend:
 ## P2 — Stream Codex events in Agent mode
 - [x] Use `/api/codex/cli/stream` for agent execution.
 - [x] UI renders streaming events + partial text (agent mode and chat target).
-- [~] Stop/reconnect improvements (stop kills subprocess; resume still pending).
+- [x] Stop/reconnect improvements (run-based streaming with resumable cursor).
 
 ## P2/P3 — MCP registry
-- [~] First-class MCP registry storage (per-user persistence via backend).
-- [~] Admin-managed MCP templates (server-side persisted).
+- [x] First-class MCP registry storage (per-user persistence via backend).
+- [x] Admin-managed MCP templates (server-side persisted).
 - [x] “Test connection” (server-side, SSRF-safe).
 - [x] “List tools” (via `/api/mcp/tools`).
 - [x] Tool allow/deny policy (UI + server-side enforcement).
@@ -51,9 +51,9 @@ Legend:
 ## P3 — RAG + indexing (docs/web/GitHub) + “password manager”
 - [x] Clarify “password manager” scope and threat model (`docs/PASSWORD_MANAGER_SCOPE.md`).
 - [x] Document upload indexing connector (MVP: text-only, keyword search).
-- [~] Website crawler indexing (MVP: same-origin crawl with depth/pages, basic robots, private-host blocking).
-- [~] GitHub repo indexing connector (MVP: owner/repo + ref + path prefix; token via env).
-- [~] Jobs UI (MVP: start/cancel/list crawl jobs).
+- [x] Website crawler indexing (MVP: same-origin crawl with depth/pages, basic robots, private-host blocking).
+- [x] GitHub repo indexing connector (MVP: owner/repo + ref + path prefix; token via env).
+- [x] Jobs UI (MVP: start/cancel/list crawl jobs).
 
 ## P3 — P2P pubsub chat + account manager
 - [ ] Account manager: identities/devices, memberships, permissions, moderation.
@@ -64,3 +64,6 @@ Legend:
 - [x] Add `.env.example`.
 - [x] Add `docs/ARCHITECTURE.md`, `docs/SECURITY_DEPLOYMENT.md`, `docs/TROUBLESHOOTING.md`.
 - [x] Add lint/tests + CI (`ruff`, `pytest`, `.github/workflows/ci.yml`).
+
+## P2/P3 — UI consolidation (nice-to-have)
+- [ ] Merge Autonomous mode and chat mode to a single chat UI.

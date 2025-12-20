@@ -2,6 +2,8 @@
 
 This file is the repo-level roadmap for `autonomy-labs`. It’s intentionally opinionated and ordered by risk reduction first, then maintainability, then feature expansion.
 
+## Always ensure mobile view too
+
 ## P0 — Security + correctness (blockers)
 
 - Gate **all dangerous endpoints** server-side (not just UI):
@@ -100,3 +102,4 @@ Note: see `docs/PASSWORD_MANAGER_SCOPE.md` for the current (non-vault) stance an
 ## Feature suggestions (By User)
 
 - Support GitHub token auth via HF Secrets (`GITHUB_TOKEN`/`GITHUB_PAT`) and document it in `.env.example`.
+- Merge Aunomous mode and chat mode to single chat UI.
