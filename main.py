@@ -18,6 +18,8 @@ import json
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+import time
+from fastapi import Request
 
 load_dotenv()
 
@@ -32,6 +34,108 @@ app.add_middleware(
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+def _env_truthy(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _feature_enabled(feature: str) -> bool:
+    # Safe behavior: if Supabase isn't configured, disable dangerous features.
+    has_supabase = bool(os.environ.get("SUPABASE_URL") and os.environ.get("SUPABASE_KEY"))
+    defaults = {
+        "terminal": has_supabase,
+        "codex": has_supabase,
+        "mcp": has_supabase,
+        "indexing": False,
+    }
+    env_map = {
+        "terminal": "ENABLE_TERMINAL",
+        "codex": "ENABLE_CODEX",
+        "mcp": "ENABLE_MCP",
+        "indexing": "ENABLE_INDEXING",
+    }
+    return _env_truthy(env_map[feature], default=defaults[feature])
+
+
+_SUPABASE_TOKEN_CACHE: dict[str, tuple[float, dict]] = {}
+
+
+async def _verify_supabase_access_token(access_token: str) -> dict:
+    """
+    Verifies a Supabase access token by calling Supabase Auth `GET /auth/v1/user`.
+    Uses a small in-memory TTL cache to avoid calling Supabase on every request.
+    """
+    access_token = (access_token or "").strip()
+    if not access_token:
+        raise HTTPException(status_code=401, detail="Missing access token")
+
+    now = time.time()
+    cached = _SUPABASE_TOKEN_CACHE.get(access_token)
+    if cached and (now - cached[0]) < 30:
+        return cached[1]
+
+    supabase_url = os.environ.get("SUPABASE_URL")
+    supabase_key = os.environ.get("SUPABASE_KEY")
+    if not supabase_url or not supabase_key:
+        raise HTTPException(status_code=503, detail="Supabase is not configured")
+
+    import httpx
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "apikey": supabase_key,
+    }
+    url = f"{supabase_url.rstrip('/')}/auth/v1/user"
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(url, headers=headers)
+        if resp.status_code != 200:
+            raise HTTPException(status_code=401, detail="Invalid or expired session")
+        user = resp.json()
+        _SUPABASE_TOKEN_CACHE[access_token] = (now, user)
+        # Best-effort cache bound
+        if len(_SUPABASE_TOKEN_CACHE) > 500:
+            for k in list(_SUPABASE_TOKEN_CACHE.keys())[:200]:
+                _SUPABASE_TOKEN_CACHE.pop(k, None)
+        return user
+
+
+async def _require_user_from_request(request: Request) -> dict:
+    auth = (request.headers.get("authorization") or "").strip()
+    if not auth.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Missing Authorization bearer token")
+    token = auth.split(None, 1)[1].strip()
+    return await _verify_supabase_access_token(token)
+
+
+def _safe_user_workdir(user: dict, requested: Optional[str]) -> str:
+    """
+    Restrict Codex workdir to an allowlisted root to prevent traversal.
+    """
+    base_root = "/data/codex/workspace" if os.path.isdir("/data") else "/app"
+    user_id = (user.get("id") or "").strip() if isinstance(user, dict) else ""
+    user_root = os.path.join(base_root, user_id) if user_id else base_root
+
+    if requested:
+        req = requested.strip()
+        if req:
+            # Only allow inside base_root.
+            norm = os.path.normpath(req)
+            if os.path.isabs(norm):
+                candidate = norm
+            else:
+                candidate = os.path.join(user_root, norm)
+            candidate = os.path.normpath(candidate)
+            base_norm = os.path.normpath(base_root)
+            if candidate == base_norm or candidate.startswith(base_norm + os.sep):
+                os.makedirs(candidate, exist_ok=True)
+                return candidate
+
+    os.makedirs(user_root, exist_ok=True)
+    return user_root
+
 
 @app.get("/config")
 async def get_config():
@@ -137,6 +241,7 @@ class CodexRequest(BaseModel):
     apiKey: Optional[str] = None
     baseUrl: Optional[str] = None
     modelReasoningEffort: Optional[str] = "minimal"
+    workingDirectory: Optional[str] = None
 
 
 def _default_codex_workdir() -> str:
@@ -146,13 +251,17 @@ def _default_codex_workdir() -> str:
     return os.path.dirname(__file__)
 
 @app.post("/api/codex")
-async def codex_agent(request: CodexRequest):
+async def codex_agent(request: CodexRequest, http_request: Request):
     """
     Runs the local Codex agent via the official @openai/codex-sdk wrapper (Node.js).
     Persists threads under ~/.codex/sessions (mapped to /data/.codex on Spaces by entrypoint).
     """
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message is required")
+    if not _feature_enabled("codex"):
+        raise HTTPException(status_code=403, detail="Codex is disabled")
+
+    user = await _require_user_from_request(http_request)
 
     node = os.environ.get("NODE_BIN", "node")
     script_path = os.path.join(os.path.dirname(__file__), "codex_agent.mjs")
@@ -166,7 +275,7 @@ async def codex_agent(request: CodexRequest):
         "sandboxMode": request.sandboxMode,
         "approvalPolicy": request.approvalPolicy,
         "modelReasoningEffort": request.modelReasoningEffort,
-        "workingDirectory": _default_codex_workdir(),
+        "workingDirectory": _safe_user_workdir(user, request.workingDirectory),
     }
 
     try:
@@ -206,7 +315,7 @@ async def codex_agent(request: CodexRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/codex/cli")
-async def codex_agent_cli(request: CodexRequest):
+async def codex_agent_cli(request: CodexRequest, http_request: Request):
     """
     Runs Codex directly via the CLI (`codex exec --json`) and extracts the final agent message.
 
@@ -214,6 +323,10 @@ async def codex_agent_cli(request: CodexRequest):
     """
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message is required")
+    if not _feature_enabled("codex"):
+        raise HTTPException(status_code=403, detail="Codex is disabled")
+
+    user = await _require_user_from_request(http_request)
 
     def _with_codex_agent_prefix(message: str) -> str:
         msg = message.strip()
@@ -232,7 +345,7 @@ async def codex_agent_cli(request: CodexRequest):
     if request.model:
         base_args += ["--model", request.model]
     # Run inside app dir; allow even if not a git repo (Spaces copies are git, but keep safe)
-    base_args += ["--cd", _default_codex_workdir(), "--skip-git-repo-check"]
+    base_args += ["--cd", _safe_user_workdir(user, request.workingDirectory), "--skip-git-repo-check"]
 
     # Provide the prompt as an argument (avoids "Reading prompt from stdin..." paths).
     if request.threadId:
@@ -309,7 +422,7 @@ async def codex_agent_cli(request: CodexRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/codex/cli/stream")
-async def codex_agent_cli_stream(request: CodexRequest):
+async def codex_agent_cli_stream(request: CodexRequest, http_request: Request):
     """
     Streams Codex CLI JSONL events (NDJSON) as the agent runs.
 
@@ -318,6 +431,10 @@ async def codex_agent_cli_stream(request: CodexRequest):
     """
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message is required")
+    if not _feature_enabled("codex"):
+        raise HTTPException(status_code=403, detail="Codex is disabled")
+
+    user = await _require_user_from_request(http_request)
 
     def _with_codex_agent_prefix(message: str) -> str:
         msg = message.strip()
@@ -332,7 +449,7 @@ async def codex_agent_cli_stream(request: CodexRequest):
         base_args += ["--config", f'approval_policy=\"{request.approvalPolicy}\"']
     if request.model:
         base_args += ["--model", request.model]
-    base_args += ["--cd", _default_codex_workdir(), "--skip-git-repo-check"]
+    base_args += ["--cd", _safe_user_workdir(user, request.workingDirectory), "--skip-git-repo-check"]
 
     if request.threadId:
         base_args += ["resume", request.threadId, message]
@@ -410,10 +527,13 @@ async def codex_agent_cli_stream(request: CodexRequest):
 
 
 @app.get("/api/codex/mcp")
-async def codex_mcp_list():
+async def codex_mcp_list(http_request: Request):
     """
     Lists configured Codex MCP servers by shelling out to `codex mcp list`.
     """
+    if not _feature_enabled("mcp"):
+        raise HTTPException(status_code=403, detail="MCP is disabled")
+    _ = await _require_user_from_request(http_request)
     try:
         proc = await asyncio.create_subprocess_exec(
             "codex",
@@ -437,12 +557,15 @@ async def codex_mcp_list():
 
 
 @app.get("/api/codex/mcp/details")
-async def codex_mcp_details():
+async def codex_mcp_details(http_request: Request):
     """
     Returns `codex mcp get --json` for each configured server.
     """
+    if not _feature_enabled("mcp"):
+        raise HTTPException(status_code=403, detail="MCP is disabled")
+    _ = await _require_user_from_request(http_request)
     try:
-        servers_resp = await codex_mcp_list()
+        servers_resp = await codex_mcp_list(http_request)
         names = servers_resp.get("servers", []) if isinstance(servers_resp, dict) else []
         details = []
         for name in names:
@@ -468,10 +591,13 @@ async def codex_mcp_details():
 
 
 @app.get("/api/codex/login/status")
-async def codex_login_status():
+async def codex_login_status(http_request: Request):
     """
     Returns Codex CLI login status for device-auth based sessions.
     """
+    if not _feature_enabled("codex"):
+        raise HTTPException(status_code=403, detail="Codex is disabled")
+    _ = await _require_user_from_request(http_request)
     try:
         proc = await asyncio.create_subprocess_exec(
             "codex",
@@ -624,10 +750,13 @@ async def _read_device_login_output(attempt: DeviceLoginAttempt) -> None:
 
 
 @app.post("/api/codex/login/device/start")
-async def codex_login_device_start():
+async def codex_login_device_start(http_request: Request):
     """
     Starts `codex login --device-auth` and returns the device URL + code (when available).
     """
+    if not _feature_enabled("codex"):
+        raise HTTPException(status_code=403, detail="Codex is disabled")
+    _ = await _require_user_from_request(http_request)
     async with app.state.device_login_lock:
         proc = await asyncio.create_subprocess_exec(
             "codex",
@@ -648,7 +777,10 @@ async def codex_login_device_start():
 
 
 @app.get("/api/codex/login/device/status")
-async def codex_login_device_status(loginId: str):
+async def codex_login_device_status(loginId: str, http_request: Request):
+    if not _feature_enabled("codex"):
+        raise HTTPException(status_code=403, detail="Codex is disabled")
+    _ = await _require_user_from_request(http_request)
     attempt = app.state.device_login_attempts.get(loginId)
     if not attempt:
         raise HTTPException(status_code=404, detail="Unknown loginId")
@@ -669,10 +801,13 @@ async def codex_login_device_status(loginId: str):
 
 
 @app.get("/api/mcp/tools")
-async def mcp_tools_list():
+async def mcp_tools_list(http_request: Request):
     """
     List tools available from the local Codex MCP server (`codex mcp-server`).
     """
+    if not _feature_enabled("mcp"):
+        raise HTTPException(status_code=403, detail="MCP is disabled")
+    _ = await _require_user_from_request(http_request)
     try:
         result = await app.state.codex_mcp_client.list_tools()
         return result
@@ -686,10 +821,13 @@ class McpCallRequest(BaseModel):
 
 
 @app.post("/api/mcp/call")
-async def mcp_tools_call(request: McpCallRequest):
+async def mcp_tools_call(request: McpCallRequest, http_request: Request):
     """
     Call a tool on the local Codex MCP server (`codex mcp-server`).
     """
+    if not _feature_enabled("mcp"):
+        raise HTTPException(status_code=403, detail="MCP is disabled")
+    _ = await _require_user_from_request(http_request)
     try:
         return await app.state.codex_mcp_client.call_tool(request.name, request.arguments)
     except Exception as e:
@@ -698,6 +836,25 @@ async def mcp_tools_call(request: McpCallRequest):
 @app.websocket("/ws/terminal")
 async def websocket_terminal(websocket: WebSocket):
     await websocket.accept()
+
+    if not _feature_enabled("terminal"):
+        await websocket.send_text("\r\n[terminal disabled]\r\n")
+        await websocket.close()
+        return
+
+    # Authenticate the WebSocket using a Supabase access token passed via query param.
+    # Browser WebSocket APIs do not allow setting Authorization headers directly.
+    token = (websocket.query_params.get("token") or "").strip()
+    if not token:
+        await websocket.send_text("\r\n[unauthorized: missing token]\r\n")
+        await websocket.close()
+        return
+    try:
+        user = await _verify_supabase_access_token(token)
+    except HTTPException as e:
+        await websocket.send_text(f"\r\n[unauthorized: {e.detail}]\r\n")
+        await websocket.close()
+        return
 
     # If token-based Codex auth is provided via env (HF Spaces Secrets), ensure the CLI auth file exists.
     # This makes `codex` work inside the web terminal even if the entrypoint didn't run (e.g., local dev).

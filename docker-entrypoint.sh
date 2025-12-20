@@ -154,6 +154,50 @@ EOF
   fi
 }
 
+ensure_ssh_from_env() {
+  local ssh_dir="${HOME}/.ssh"
+  local key_path="${ssh_dir}/id_ed25519"
+
+  if [[ -z "${SSH_PRIVATE_KEY:-}" ]]; then
+    return 0
+  fi
+
+  mkdir -p "${ssh_dir}"
+  chmod 700 "${ssh_dir}"
+
+  if [[ -f "${key_path}" ]] && [[ "${SSH_OVERWRITE:-}" != "1" ]]; then
+    echo "[ssh] SSH_PRIVATE_KEY provided but ${key_path} already exists; set SSH_OVERWRITE=1 to replace."
+    return 0
+  fi
+
+  printf '%s\n' "${SSH_PRIVATE_KEY}" >"${key_path}"
+  chmod 600 "${key_path}"
+
+  if [[ -n "${SSH_PUBLIC_KEY:-}" ]]; then
+    printf '%s\n' "${SSH_PUBLIC_KEY}" >"${key_path}.pub"
+    chmod 644 "${key_path}.pub" || true
+  elif command -v ssh-keygen >/dev/null 2>&1; then
+    ssh-keygen -y -f "${key_path}" >"${key_path}.pub" 2>/dev/null || true
+    chmod 644 "${key_path}.pub" || true
+  fi
+
+  if [[ -n "${SSH_KNOWN_HOSTS:-}" ]]; then
+    printf '%s\n' "${SSH_KNOWN_HOSTS}" >"${ssh_dir}/known_hosts"
+    chmod 600 "${ssh_dir}/known_hosts" || true
+  fi
+
+  cat >"${ssh_dir}/config" <<'EOF'
+Host *
+  AddKeysToAgent no
+  IdentitiesOnly yes
+  StrictHostKeyChecking accept-new
+EOF
+  chmod 600 "${ssh_dir}/config" || true
+  chown -R "$(id -u)":"$(id -g)" "${ssh_dir}" 2>/dev/null || true
+
+  echo "[ssh] Installed SSH key from env into ${key_path}"
+}
+
 persist_codex_dir_if_possible
 ensure_codex_home_permissions
 ensure_codex_auth_from_env
@@ -161,6 +205,7 @@ persist_ssh_dir_if_possible
 ensure_codex_workspace_dir
 
 if command -v ssh-keygen >/dev/null 2>&1; then
+  ensure_ssh_from_env
   ensure_ssh_keypair
 else
   echo "[git ssh] ssh-keygen not found; install openssh-client to enable SSH key generation." >&2
