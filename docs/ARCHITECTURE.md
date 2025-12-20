@@ -17,7 +17,9 @@
   - `codex.py`: `/api/codex*` and Codex login helpers
   - `mcp.py`: `/api/mcp/*`
   - `terminal.py`: `/ws/terminal`
+  - `user.py`: `/api/me` and per-user persisted config (e.g., MCP registry)
 - `app/auth.py`: Supabase access-token verification (server-side) with small TTL cache.
+- `app/storage.py`: per-user server-side persistence directory selection (`/data` preferred).
 
 ## Frontend layout
 
@@ -31,4 +33,3 @@ The following capabilities are high-risk and gated:
 - MCP tool calls
 
 Auth is enforced server-side via Supabase access tokens. Feature flags can disable them entirely.
-

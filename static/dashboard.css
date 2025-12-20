@@ -1,0 +1,370 @@
+/* Common background utility overrides for light mode */
+[data-theme="light"] .bg-gray-900 { background-color: var(--panel-bg-2) !important; }
+[data-theme="light"] .bg-gray-800 { background-color: var(--panel-bg) !important; }
+[data-theme="light"] .bg-black { background-color: #0b1220 !important; }
+[data-theme="light"] #terminal-view { background-color: var(--panel-bg-2) !important; }
+[data-theme="light"] .border-gray-700 { border-color: var(--border) !important; }
+[data-theme="light"] .border-gray-600 { border-color: var(--border) !important; }
+
+/* Text utility overrides for light mode */
+[data-theme="light"] .text-white { color: var(--app-fg) !important; }
+[data-theme="light"] .text-gray-300 { color: rgba(15, 23, 42, 0.92) !important; }
+[data-theme="light"] .text-gray-400 { color: rgba(15, 23, 42, 0.78) !important; }
+[data-theme="light"] .text-gray-500 { color: rgba(15, 23, 42, 0.66) !important; }
+[data-theme="light"] .text-gray-200 { color: rgba(15, 23, 42, 0.96) !important; }
+
+[data-theme="light"] a { color: #1d4ed8; }
+[data-theme="light"] .prose a { color: #1d4ed8; }
+
+/* Inputs in light mode */
+[data-theme="light"] input,
+[data-theme="light"] textarea,
+[data-theme="light"] select {
+    background-color: #ffffff !important;
+    color: var(--app-fg) !important;
+    border-color: var(--border) !important;
+}
+
+/* Chat bubbles in light mode */
+[data-theme="light"] .user-message {
+    background-color: rgba(37, 99, 235, 0.10);
+    border-color: rgba(37, 99, 235, 0.22);
+    color: rgba(2, 6, 23, 0.9);
+}
+[data-theme="light"] .ai-message {
+    background-color: rgba(15, 23, 42, 0.04);
+    border-color: rgba(15, 23, 42, 0.10);
+    color: rgba(2, 6, 23, 0.9);
+}
+
+/* Notes preview readability in light mode */
+[data-theme="light"] #notes-preview {
+    color: rgba(2, 6, 23, 0.92);
+}
+
+/* Dashboard cards/surfaces in light mode (Tailwind arbitrary opacity classes) */
+[data-theme="light"] .bg-gray-800\\/60 { background-color: rgba(255, 255, 255, 0.92) !important; }
+[data-theme="light"] .bg-gray-900\\/40 { background-color: rgba(15, 23, 42, 0.03) !important; }
+[data-theme="light"] .bg-gray-900\\/30 { background-color: rgba(15, 23, 42, 0.03) !important; }
+
+[data-theme="light"] .shadow-xl { box-shadow: 0 18px 45px rgba(2, 6, 23, 0.08) !important; }
+.view-section {
+    transition: opacity 0.2s;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    bg: #1f2937;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #4b5563;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+}
+
+.katex {
+    font-size: 1.1em;
+}
+
+.chat-message pre {
+    margin: 0;
+    padding: 0.5rem;
+    background: #1a1b26;
+    border-radius: 0.5rem;
+    position: relative;
+    overflow-x: auto;
+}
+
+/* Ensure code is always readable (prose/prose-invert can override colors). */
+.chat-message pre code {
+    color: #e5e7eb !important;
+    background: transparent !important;
+    font-size: 0.9em;
+}
+
+.chat-message code {
+    color: #e5e7eb !important;
+}
+
+.chat-message :not(pre) > code {
+    color: #e5e7eb;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 0.1rem 0.3rem;
+    border-radius: 0.35rem;
+}
+
+/* Tailwind typography adds backticks via pseudo-elements; disable to avoid confusion. */
+.chat-message.prose code::before,
+.chat-message.prose code::after {
+    content: "" !important;
+}
+
+.chat-message pre code .hljs-comment,
+.chat-message pre code .hljs-quote {
+    color: #9ca3af;
+}
+
+.copy-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: #374151;
+    color: white;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.chat-message pre:hover .copy-btn {
+    opacity: 1;
+}
+
+.run-btn {
+    position: absolute;
+    top: 5px;
+    right: 56px;
+    background: #2563eb;
+    color: white;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.75rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.chat-message pre:hover .run-btn {
+    opacity: 1;
+}
+
+.xterm-viewport {
+    overflow-y: hidden !important;
+}
+
+/* Ubuntu-ish terminal look */
+.xterm, .xterm * {
+    font-family: "Ubuntu Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Terminal chrome (borders + subtle depth) */
+#terminals-container > div,
+#agent-terminals-container > div {
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    background: #300a24;
+}
+
+[data-theme="light"] #terminals-container > div {
+    border-color: rgba(2, 6, 23, 0.12);
+    box-shadow: 0 10px 30px rgba(2, 6, 23, 0.10);
+}
+
+/* Make the xterm area blend with the chrome */
+#terminals-container .xterm,
+#agent-terminals-container .xterm {
+    padding: 10px;
+}
+
+/* Nicer scrollbars inside terminals */
+#terminals-container .xterm-viewport::-webkit-scrollbar,
+#agent-terminals-container .xterm-viewport::-webkit-scrollbar {
+    width: 10px;
+}
+#terminals-container .xterm-viewport::-webkit-scrollbar-thumb,
+#agent-terminals-container .xterm-viewport::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.25);
+    border-radius: 10px;
+    border: 2px solid rgba(0, 0, 0, 0);
+    background-clip: padding-box;
+}
+
+/* Resizable terminal viewport wrapper */
+.terminal-resizable {
+    resize: both;
+    overflow: auto;
+    min-width: 320px;
+    min-height: 200px;
+    max-width: 100%;
+    max-height: 100%;
+    position: relative;
+}
+
+/* Terminal split layouts (Terminal tab only) */
+.terminal-grid {
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+}
+.terminal-grid.single { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+.terminal-grid.vsplit { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr; }
+.terminal-grid.hsplit { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+.terminal-grid.quad { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.terminal-pane {
+    position: relative;
+    min-height: 0;
+    min-width: 0;
+}
+
+/* Agent split panes (chat | terminal) */
+.split-root {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+}
+
+.split-pane {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.split-divider {
+    width: 10px;
+    cursor: col-resize;
+    background: linear-gradient(to bottom, rgba(148, 163, 184, 0.15), rgba(148, 163, 184, 0.05));
+    border-left: 1px solid rgba(148, 163, 184, 0.15);
+    border-right: 1px solid rgba(148, 163, 184, 0.15);
+    flex: 0 0 auto;
+    user-select: none;
+    touch-action: none;
+}
+
+.split-divider::after {
+    content: "";
+    position: absolute;
+    width: 4px;
+    height: 42px;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 6px;
+    background: rgba(148, 163, 184, 0.25);
+}
+
+.split-divider {
+    position: relative;
+}
+
+.agent-terminal-chrome {
+    background: radial-gradient(1200px 600px at 20% 0%, rgba(114, 159, 207, 0.18), transparent 60%),
+                radial-gradient(1000px 500px at 80% 100%, rgba(173, 127, 168, 0.12), transparent 55%),
+                #0b1220;
+}
+
+.agent-pane-surface {
+    background: rgba(15, 23, 42, 0.35);
+}
+
+.agent-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(75, 85, 99, 0.7);
+    background: rgba(17, 24, 39, 0.75);
+    backdrop-filter: blur(6px);
+}
+
+.agent-toolbar .hint {
+    font-size: 12px;
+    color: rgba(203, 213, 225, 0.75);
+}
+
+.attachment-strip {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.attachment-thumb {
+    width: 88px;
+    height: 64px;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    background: rgba(15, 23, 42, 0.35);
+}
+
+.attachment-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.attachment-thumb button {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    border: 0;
+    background: rgba(15, 23, 42, 0.75);
+    color: #e5e7eb;
+    cursor: pointer;
+    line-height: 20px;
+    font-size: 12px;
+}
+
+/* Unified Settings drawer */
+.settings-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(2, 6, 23, 0.6);
+    backdrop-filter: blur(2px);
+    z-index: 50;
+}
+
+.settings-drawer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: min(420px, 92vw);
+    background: rgba(17, 24, 39, 0.98);
+    border-left: 1px solid rgba(75, 85, 99, 0.7);
+    z-index: 60;
+    box-shadow: -20px 0 50px rgba(0, 0, 0, 0.35);
+}
+
+.settings-hidden {
+    display: none;
+}
+
+.chat-message {
+    max-width: 80%;
+    padding: 10px;
+    margin: 5px;
+    border-radius: 10px;
+    word-wrap: break-word;
+}
+
+.user-message {
+    background-color: rgba(96, 165, 250, 0.22);
+    border: 1px solid rgba(96, 165, 250, 0.35);
+    align-self: flex-end;
+    color: #e6f0ff;
+}
+
+.ai-message {
+    background-color: rgba(148, 163, 184, 0.12);
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    align-self: flex-start;
+    color: #f1f5f9;
+}

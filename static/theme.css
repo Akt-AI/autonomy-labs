@@ -1,0 +1,73 @@
+:root {
+  --app-bg: #111827;
+  --app-fg: #ffffff;
+  --panel-bg: #1f2937;
+  --panel-bg-2: #111827;
+  --border: rgba(75, 85, 99, 0.7);
+  --muted: rgba(203, 213, 225, 0.75);
+}
+
+[data-theme="light"] {
+  --app-bg: #f6f7fb;
+  --app-fg: #0b1220;
+  --panel-bg: #ffffff;
+  --panel-bg-2: #f3f5fa;
+  --border: rgba(2, 6, 23, 0.12);
+  --muted: rgba(30, 41, 59, 0.72);
+}
+
+html,
+body {
+  background: var(--app-bg);
+  color: var(--app-fg);
+}
+
+nav,
+footer {
+  background: var(--panel-bg) !important;
+  border-color: var(--border) !important;
+}
+
+[data-theme="light"] .bg-gray-900 {
+  background-color: var(--panel-bg-2) !important;
+}
+[data-theme="light"] .bg-gray-800 {
+  background-color: var(--panel-bg) !important;
+}
+[data-theme="light"] .bg-black {
+  background-color: #0b1220 !important;
+}
+[data-theme="light"] .border-gray-700,
+[data-theme="light"] .border-gray-600 {
+  border-color: var(--border) !important;
+}
+
+[data-theme="light"] .text-white {
+  color: var(--app-fg) !important;
+}
+[data-theme="light"] .text-gray-300 {
+  color: rgba(15, 23, 42, 0.92) !important;
+}
+[data-theme="light"] .text-gray-400 {
+  color: rgba(15, 23, 42, 0.78) !important;
+}
+[data-theme="light"] .text-gray-500 {
+  color: rgba(15, 23, 42, 0.66) !important;
+}
+[data-theme="light"] .text-gray-200 {
+  color: rgba(15, 23, 42, 0.96) !important;
+}
+
+[data-theme="light"] a,
+[data-theme="light"] .prose a {
+  color: #1d4ed8;
+}
+
+[data-theme="light"] input,
+[data-theme="light"] textarea,
+[data-theme="light"] select {
+  background-color: #ffffff !important;
+  color: var(--app-fg) !important;
+  border-color: var(--border) !important;
+}
+

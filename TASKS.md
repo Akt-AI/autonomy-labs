@@ -20,9 +20,9 @@ Legend:
 - [ ] Standardize API error schema across endpoints (single shape for UI).
 
 ## P2 — UI/UX, settings, admin, landing
-- [~] Landing + route split (`/` landing, `/login`, `/app`) and UI redirects updated.
-- [ ] Split `static/dashboard.html` into JS/CSS modules.
-- [ ] Theme tokens shared across login + dashboard (single source of truth).
+- [x] Landing + route split (`/` landing, `/login`, `/app`) and UI redirects updated.
+- [x] Split `static/dashboard.html` into JS/CSS files (`static/dashboard.js`, `static/dashboard.css`).
+- [~] Theme tokens shared across login + dashboard (single source of truth via `static/theme.css`).
 - [ ] Separate Settings vs Admin dashboard (dedicated pages/sections + RBAC).
 
 ## P2 — Provider auth parity (Codex/Gemini/Claude)
@@ -41,7 +41,7 @@ Legend:
 - [ ] Stop/reconnect improvements (resume stream after transient disconnects).
 
 ## P2/P3 — MCP registry
-- [ ] First-class MCP registry storage (per-user + templates).
+- [~] First-class MCP registry storage (per-user persistence via backend).
 - [ ] “Test connection”, “list tools”, tool allow/deny UI.
 - [ ] Import/export `mcp.json` via UI with validation.
 
@@ -61,4 +61,3 @@ Legend:
 - [x] Add `.env.example`.
 - [x] Add `docs/ARCHITECTURE.md`, `docs/SECURITY_DEPLOYMENT.md`, `docs/TROUBLESHOOTING.md`.
 - [x] Add lint/tests + CI (`ruff`, `pytest`, `.github/workflows/ci.yml`).
-

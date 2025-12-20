@@ -38,6 +38,16 @@ async def read_app():
     return FileResponse(str(_STATIC / "dashboard.html"))
 
 
+@router.get("/settings")
+async def read_settings():
+    return FileResponse(str(_STATIC / "dashboard.html"))
+
+
+@router.get("/admin")
+async def read_admin():
+    return FileResponse(str(_STATIC / "dashboard.html"))
+
+
 @router.get("/health")
 async def health_check():
     return {"status": "ok"}
