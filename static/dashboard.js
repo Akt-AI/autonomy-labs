@@ -379,6 +379,8 @@ let supabase;
             if (el) el.textContent = text || '';
         }
 
+        let indexingJobsPollTimer = null;
+
         function renderIndexingJobs(jobs) {
             const el = document.getElementById('indexing-jobs');
             if (!el) return;
@@ -425,6 +427,22 @@ let supabase;
                 left.appendChild(title);
                 left.appendChild(meta);
 
+                if (j?.error) {
+                    const err = document.createElement('div');
+                    err.className = 'text-xs text-red-300 mt-1 whitespace-pre-wrap';
+                    err.textContent = String(j.error);
+                    left.appendChild(err);
+                } else if (j?.status === 'succeeded') {
+                    const result = j?.result || {};
+                    const ragDocId = result?.ragDoc?.id;
+                    if (ragDocId) {
+                        const ok = document.createElement('div');
+                        ok.className = 'text-xs text-green-300 mt-1';
+                        ok.textContent = `Indexed into RAG doc: ${ragDocId}`;
+                        left.appendChild(ok);
+                    }
+                }
+
                 const right = document.createElement('div');
                 right.className = 'shrink-0 flex gap-2';
                 if (j?.status === 'running' || j?.status === 'queued') {
@@ -432,6 +450,13 @@ let supabase;
                     btn.className = 'bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs';
                     btn.textContent = 'Cancel';
                     btn.onclick = () => cancelIndexingJob(String(j?.id || ''));
+                    right.appendChild(btn);
+                }
+                if (j?.status === 'succeeded') {
+                    const btn = document.createElement('button');
+                    btn.className = 'bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs';
+                    btn.textContent = 'Refresh RAG';
+                    btn.onclick = () => loadRagDocuments();
                     right.appendChild(btn);
                 }
 
@@ -449,6 +474,14 @@ let supabase;
                 const data = await res.json();
                 renderIndexingJobs(data?.jobs || []);
                 setIndexingStatus('');
+                try {
+                    if (indexingJobsPollTimer) clearTimeout(indexingJobsPollTimer);
+                    const jobs = Array.isArray(data?.jobs) ? data.jobs : [];
+                    const running = jobs.some((j) => j?.status === 'running' || j?.status === 'queued');
+                    if (running) {
+                        indexingJobsPollTimer = setTimeout(() => loadIndexingJobs(), 2000);
+                    }
+                } catch { }
             } catch (e) {
                 setIndexingStatus(`Failed to load jobs: ${e?.message || e}`);
             }
