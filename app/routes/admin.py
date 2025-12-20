@@ -87,7 +87,7 @@ async def get_feature_overrides(http_request: Request):
     user = await require_user_from_request(http_request)
     _require_admin(user)
     overrides = load_feature_overrides()
-    features = ["terminal", "codex", "mcp", "indexing", "rooms"]
+    features = ["terminal", "codex", "mcp", "indexing", "rooms", "vault"]
     return {
         "ok": True,
         "features": {
@@ -102,7 +102,7 @@ async def get_feature_overrides(http_request: Request):
 async def put_feature_overrides(body: FeatureOverridesBody, http_request: Request):
     user = await require_user_from_request(http_request)
     _require_admin(user)
-    allowed = {"terminal", "codex", "mcp", "indexing", "rooms"}
+    allowed = {"terminal", "codex", "mcp", "indexing", "rooms", "vault"}
     overrides = {}
     for k, v in (body.overrides or {}).items():
         key = str(k).strip()

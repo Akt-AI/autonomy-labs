@@ -5,6 +5,7 @@ This app includes features that can become remote-code-execution (RCE) if expose
 - Agent/Codex execution (`/api/codex*`)
 - MCP tool calls (`/api/mcp*`)
 - Rooms WebSocket (`/ws/rooms`) if misconfigured (cross-user data exposure)
+- Vault storage (`/api/vault`) if the UI is compromised (XSS can exfiltrate decrypted secrets)
 
 ## Current protections
 - The dashboard UI requires a Supabase session.
@@ -19,6 +20,7 @@ This app includes features that can become remote-code-execution (RCE) if expose
   - `ENABLE_MCP`
   - `ENABLE_INDEXING`
   - `ENABLE_ROOMS`
+  - `ENABLE_VAULT`
 
 ## Notes
 - Browser clients cannot set `Authorization` headers for WebSockets, so the terminal WebSocket uses a Supabase access token passed via a query param. Treat app access tokens as sensitive.

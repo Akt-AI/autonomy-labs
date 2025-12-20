@@ -80,3 +80,7 @@ If P2P fails, keep “Prefer P2P” off and it will use server WebSockets for me
 
 Supabase email delivery depends on your project auth settings and SMTP configuration.
 Check Supabase → Authentication → Settings (and SMTP) and verify your site URL/redirect URLs include `/login`.
+
+## Vault is disabled
+
+Set `ENABLE_VAULT=1` and restart the container (admins can also toggle the Vault feature override).

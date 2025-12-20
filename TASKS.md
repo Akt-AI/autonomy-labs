@@ -10,7 +10,7 @@ Legend:
 ## P0 — Security + correctness
 - [x] Gate dangerous endpoints server-side (`/ws/terminal`, `/api/codex*`, `/api/mcp*`).
 - [x] Define WebSocket auth transport (token in query string for `/ws/terminal`).
-- [x] Add capability flags (`ENABLE_TERMINAL`, `ENABLE_CODEX`, `ENABLE_MCP`, `ENABLE_INDEXING`, `ENABLE_ROOMS`) with safe defaults.
+- [x] Add capability flags (`ENABLE_TERMINAL`, `ENABLE_CODEX`, `ENABLE_MCP`, `ENABLE_INDEXING`, `ENABLE_ROOMS`, `ENABLE_VAULT`) with safe defaults.
 - [x] Add `SECURITY.md` with threat model + guidance.
 
 ## P1 — Backend refactor + lifecycle
@@ -50,6 +50,7 @@ Legend:
 
 ## P3 — RAG + indexing (docs/web/GitHub) + “password manager”
 - [x] Clarify “password manager” scope and threat model (`docs/PASSWORD_MANAGER_SCOPE.md`).
+- [x] Add encrypted vault MVP (client-side crypto + server blob storage).
 - [x] Document upload indexing connector (MVP: text-only, keyword search).
 - [x] Website crawler indexing (MVP: same-origin crawl with depth/pages, basic robots, private-host blocking).
 - [x] GitHub repo indexing connector (MVP: owner/repo + ref + path prefix; token via env).

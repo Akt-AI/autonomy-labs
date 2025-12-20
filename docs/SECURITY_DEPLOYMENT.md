@@ -17,6 +17,7 @@ Consider explicitly setting:
 - `ENABLE_CODEX=0` unless you truly need it
 - `ENABLE_MCP=0` unless you truly need it
 - `ENABLE_ROOMS=0` unless you need multi-user rooms/presence
+- `ENABLE_VAULT=0` unless you need local encrypted vault storage
 
 ## WebSocket auth
 

@@ -45,6 +45,7 @@ async def me(http_request: Request):
             "mcp": feature_enabled("mcp"),
             "indexing": feature_enabled("indexing"),
             "rooms": feature_enabled("rooms"),
+            "vault": feature_enabled("vault"),
         },
     }
 

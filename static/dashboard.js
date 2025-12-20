@@ -383,6 +383,7 @@ let supabase;
                     `<div class=\"bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2\">mcp: <span class=\"text-gray-100\">${f.mcp ? 'on' : 'off'}</span></div>`,
                     `<div class=\"bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2\">indexing: <span class=\"text-gray-100\">${f.indexing ? 'on' : 'off'}</span></div>`,
                     `<div class=\"bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2\">rooms: <span class=\"text-gray-100\">${f.rooms ? 'on' : 'off'}</span></div>`,
+                    `<div class=\"bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2\">vault: <span class=\"text-gray-100\">${f.vault ? 'on' : 'off'}</span></div>`,
                 ].join('');
             }
         }
@@ -395,6 +396,17 @@ let supabase;
             if (disabled) disabled.classList.toggle('hidden', enabled);
             if (controls) controls.classList.toggle('hidden', !enabled);
             if (status && !enabled) status.textContent = 'Enable indexing with ENABLE_INDEXING=1 and restart.';
+        }
+
+        function applyVaultUi(me) {
+            const enabled = !!me?.features?.vault;
+            const disabled = document.getElementById('vault-disabled');
+            const status = document.getElementById('vault-status');
+            const panel = document.getElementById('vault-panel');
+            if (!panel) return;
+            if (disabled) disabled.classList.toggle('hidden', enabled);
+            if (status && !enabled) status.textContent = 'Enable vault with ENABLE_VAULT=1 and restart.';
+            panel.classList.toggle('opacity-60', !enabled);
         }
 
         function setIndexingStatus(text) {
@@ -782,6 +794,7 @@ let supabase;
                 mcp: document.getElementById('admin-override-mcp'),
                 indexing: document.getElementById('admin-override-indexing'),
                 rooms: document.getElementById('admin-override-rooms'),
+                vault: document.getElementById('admin-override-vault'),
             };
         }
 
@@ -872,6 +885,7 @@ let supabase;
                 const me = await loadMe();
                 applyAdminUi(me);
                 applyIndexingUi(me);
+                applyVaultUi(me);
                 if (me?.features?.indexing) {
                     loadRagDocuments();
                     loadIndexingJobs();
@@ -989,6 +1003,16 @@ let supabase;
                             sendRoomMessage();
                         }
                     });
+                }
+
+                // Vault settings
+                vaultEnabled = !!me?.features?.vault;
+                const vaultSearch = document.getElementById('vault-search');
+                if (vaultSearch) {
+                    vaultSearch.addEventListener('input', () => renderVaultEntries());
+                }
+                if (vaultEnabled) {
+                    loadVaultFromServer();
                 }
 
                 // Multi-modal attachments
@@ -3803,6 +3827,298 @@ let supabase;
                     sendRoomsWs({ type: 'signal', toDeviceId: peerId, payload: { kind: 'sdp', description: pc.localDescription } });
                 }
             }
+        }
+
+        // --- Vault (client-side encrypted, server persisted) ---
+        let vaultEnabled = false;
+        let vaultBlob = null; // latest server blob
+        let vaultKey = null; // CryptoKey
+        let vaultData = null; // { version, entries: [...] }
+
+        function setVaultStatus(msg) {
+            const el = document.getElementById('vault-status');
+            if (el) el.textContent = msg || '';
+        }
+
+        function b64EncodeBytes(bytes) {
+            let binary = '';
+            const chunkSize = 0x8000;
+            for (let i = 0; i < bytes.length; i += chunkSize) {
+                binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+            }
+            return btoa(binary);
+        }
+
+        function b64DecodeToBytes(b64) {
+            const binary = atob(String(b64 || ''));
+            const out = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
+            return out;
+        }
+
+        async function deriveVaultKey(password, saltBytes, iterations = 150000) {
+            const enc = new TextEncoder();
+            const baseKey = await crypto.subtle.importKey('raw', enc.encode(String(password || '')), 'PBKDF2', false, ['deriveKey']);
+            return crypto.subtle.deriveKey(
+                { name: 'PBKDF2', salt: saltBytes, iterations, hash: 'SHA-256' },
+                baseKey,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['encrypt', 'decrypt']
+            );
+        }
+
+        async function encryptVaultJson(key, obj) {
+            const enc = new TextEncoder();
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const plaintext = enc.encode(JSON.stringify(obj));
+            const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plaintext));
+            return { iv, ct };
+        }
+
+        async function decryptVaultJson(key, ivBytes, ctBytes) {
+            const dec = new TextDecoder();
+            const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: ivBytes }, key, ctBytes);
+            return JSON.parse(dec.decode(new Uint8Array(pt)));
+        }
+
+        function renderVaultEntries() {
+            const el = document.getElementById('vault-entries');
+            if (!el) return;
+            el.innerHTML = '';
+            if (!vaultKey || !vaultData) {
+                const empty = document.createElement('div');
+                empty.className = 'text-xs text-gray-500';
+                empty.textContent = 'Locked. Unlock to view entries.';
+                el.appendChild(empty);
+                return;
+            }
+            const q = (document.getElementById('vault-search')?.value || '').trim().toLowerCase();
+            const entries = Array.isArray(vaultData.entries) ? vaultData.entries : [];
+            const filtered = q
+                ? entries.filter((e) => JSON.stringify(e || {}).toLowerCase().includes(q))
+                : entries;
+            if (!filtered.length) {
+                const empty = document.createElement('div');
+                empty.className = 'text-xs text-gray-500';
+                empty.textContent = 'No entries.';
+                el.appendChild(empty);
+                return;
+            }
+            for (const entry of filtered.slice(0, 60)) {
+                const card = document.createElement('div');
+                card.className = 'bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2';
+
+                const top = document.createElement('div');
+                top.className = 'flex items-center justify-between gap-2';
+                const title = document.createElement('div');
+                title.className = 'text-sm font-semibold text-gray-100 truncate';
+                title.textContent = entry.name || 'Entry';
+                const actions = document.createElement('div');
+                actions.className = 'flex items-center gap-2';
+
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs';
+                copyBtn.textContent = 'Copy';
+                copyBtn.onclick = () => navigator.clipboard.writeText(entry.password || '').catch(() => { });
+
+                const editBtn = document.createElement('button');
+                editBtn.className = 'bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs';
+                editBtn.textContent = 'Edit';
+                editBtn.onclick = () => editVaultEntry(entry.id);
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'bg-red-700 hover:bg-red-600 text-white px-2 py-1 rounded text-xs';
+                delBtn.textContent = 'Del';
+                delBtn.onclick = () => deleteVaultEntry(entry.id);
+
+                actions.appendChild(copyBtn);
+                actions.appendChild(editBtn);
+                actions.appendChild(delBtn);
+                top.appendChild(title);
+                top.appendChild(actions);
+
+                const meta = document.createElement('div');
+                meta.className = 'text-xs text-gray-400 mt-1 grid grid-cols-1 md:grid-cols-2 gap-1';
+                const u = document.createElement('div');
+                u.textContent = entry.username ? `user: ${entry.username}` : '';
+                const url = document.createElement('div');
+                url.textContent = entry.url ? `url: ${entry.url}` : '';
+                meta.appendChild(u);
+                meta.appendChild(url);
+
+                card.appendChild(top);
+                if (entry.username || entry.url) card.appendChild(meta);
+                el.appendChild(card);
+            }
+        }
+
+        async function loadVaultFromServer() {
+            if (!vaultEnabled) return;
+            try {
+                setVaultStatus('Loading…');
+                const res = await authFetch('/api/vault');
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                vaultBlob = data?.vault || null;
+                if (!vaultBlob) {
+                    setVaultStatus('No vault found. Click New to create.');
+                } else {
+                    setVaultStatus('Vault loaded. Enter password to unlock.');
+                }
+                renderVaultEntries();
+            } catch (e) {
+                setVaultStatus(`Load failed: ${e?.message || e}`);
+            }
+        }
+
+        function lockVault() {
+            vaultKey = null;
+            vaultData = null;
+            setVaultStatus('Locked.');
+            renderVaultEntries();
+        }
+
+        async function unlockVault() {
+            if (!vaultEnabled) return;
+            const pass = document.getElementById('vault-password')?.value || '';
+            if (!pass) {
+                setVaultStatus('Enter a password.');
+                return;
+            }
+            if (!vaultBlob) {
+                setVaultStatus('No vault exists yet. Click New to create.');
+                return;
+            }
+            try {
+                const salt = b64DecodeToBytes(vaultBlob.salt);
+                const iv = b64DecodeToBytes(vaultBlob.iv);
+                const ct = b64DecodeToBytes(vaultBlob.ciphertext);
+                const iter = Number(vaultBlob?.kdf?.iterations || 150000);
+                vaultKey = await deriveVaultKey(pass, salt, Math.max(50_000, Math.min(iter, 500_000)));
+                vaultData = await decryptVaultJson(vaultKey, iv, ct);
+                if (!vaultData || typeof vaultData !== 'object') throw new Error('Invalid vault');
+                if (!Array.isArray(vaultData.entries)) vaultData.entries = [];
+                setVaultStatus(`Unlocked (${vaultData.entries.length} entries).`);
+                renderVaultEntries();
+            } catch (e) {
+                vaultKey = null;
+                vaultData = null;
+                setVaultStatus(`Unlock failed: ${e?.message || e}`);
+            }
+        }
+
+        async function saveVaultToServer() {
+            if (!vaultEnabled) return;
+            if (!vaultKey || !vaultData) {
+                setVaultStatus('Unlock first.');
+                return;
+            }
+            try {
+                setVaultStatus('Saving…');
+                const pass = document.getElementById('vault-password')?.value || '';
+                if (!pass) throw new Error('Missing password in input');
+                const salt = vaultBlob?.salt ? b64DecodeToBytes(vaultBlob.salt) : crypto.getRandomValues(new Uint8Array(16));
+                const iterations = 150000;
+                vaultKey = await deriveVaultKey(pass, salt, iterations);
+                const { iv, ct } = await encryptVaultJson(vaultKey, vaultData);
+                const blob = {
+                    version: 1,
+                    kdf: { algo: 'PBKDF2', hash: 'SHA-256', iterations },
+                    salt: b64EncodeBytes(salt),
+                    iv: b64EncodeBytes(iv),
+                    ciphertext: b64EncodeBytes(ct),
+                };
+                const res = await authFetch('/api/vault', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(blob),
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const saved = await res.json();
+                vaultBlob = { ...blob, updatedAt: saved?.updatedAt || null };
+                setVaultStatus('Saved.');
+            } catch (e) {
+                setVaultStatus(`Save failed: ${e?.message || e}`);
+            }
+        }
+
+        async function createNewVault() {
+            if (!vaultEnabled) return;
+            const pass = document.getElementById('vault-password')?.value || '';
+            if (!pass || String(pass).length < 8) {
+                setVaultStatus('Choose a password (min 8 chars).');
+                return;
+            }
+            if (vaultBlob && !confirm('Overwrite existing vault?')) return;
+            vaultData = { version: 1, entries: [] };
+            vaultBlob = null;
+            vaultKey = null;
+            await saveVaultToServer();
+            setVaultStatus('New vault created. Unlock to add entries.');
+        }
+
+        function openVaultNewEntry() {
+            if (!vaultEnabled) return;
+            if (!vaultKey || !vaultData) {
+                setVaultStatus('Unlock first.');
+                return;
+            }
+            const name = prompt('Name:', '') || '';
+            if (!name.trim()) return;
+            const username = prompt('Username (optional):', '') || '';
+            const password = prompt('Password:', '') || '';
+            if (!password) return;
+            const url = prompt('URL (optional):', '') || '';
+            const notes = prompt('Notes (optional):', '') || '';
+            const entry = {
+                id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+                name: name.trim().slice(0, 120),
+                username: username.trim().slice(0, 200),
+                password: String(password),
+                url: url.trim().slice(0, 500),
+                notes: notes.trim().slice(0, 2000),
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+            };
+            vaultData.entries.unshift(entry);
+            renderVaultEntries();
+            saveVaultToServer();
+        }
+
+        function editVaultEntry(entryId) {
+            if (!vaultKey || !vaultData) return;
+            const entries = Array.isArray(vaultData.entries) ? vaultData.entries : [];
+            const idx = entries.findIndex((e) => String(e?.id || '') === String(entryId));
+            if (idx < 0) return;
+            const entry = entries[idx];
+            const name = prompt('Name:', entry.name || '') || '';
+            if (!name.trim()) return;
+            const username = prompt('Username:', entry.username || '') || '';
+            const password = prompt('Password:', entry.password || '') || '';
+            if (!password) return;
+            const url = prompt('URL:', entry.url || '') || '';
+            const notes = prompt('Notes:', entry.notes || '') || '';
+            entries[idx] = {
+                ...entry,
+                name: name.trim().slice(0, 120),
+                username: username.trim().slice(0, 200),
+                password: String(password),
+                url: url.trim().slice(0, 500),
+                notes: notes.trim().slice(0, 2000),
+                updatedAt: new Date().toISOString(),
+            };
+            renderVaultEntries();
+            saveVaultToServer();
+        }
+
+        function deleteVaultEntry(entryId) {
+            if (!vaultKey || !vaultData) return;
+            if (!confirm('Delete this entry?')) return;
+            const entries = Array.isArray(vaultData.entries) ? vaultData.entries : [];
+            vaultData.entries = entries.filter((e) => String(e?.id || '') !== String(entryId));
+            renderVaultEntries();
+            saveVaultToServer();
         }
 
         // --- Notes (folders + markdown docs) ---

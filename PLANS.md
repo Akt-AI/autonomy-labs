@@ -108,3 +108,4 @@ Note: see `docs/PASSWORD_MANAGER_SCOPE.md` for the current (non-vault) stance an
 - Get started on landing page should go to a documentaion page.
 - Open App and Login should point to login page.
 - Provider setting on path /app should be only on settings page.
+- Forget password not working. Fix.

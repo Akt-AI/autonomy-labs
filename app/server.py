@@ -26,6 +26,7 @@ from app.routes.rooms import router as rooms_router
 from app.routes.rag import router as rag_router
 from app.routes.terminal import router as terminal_router
 from app.routes.user import router as user_router
+from app.routes.vault import router as vault_router
 
 _ROOT = Path(__file__).resolve().parent.parent
 
@@ -121,5 +122,6 @@ def create_app() -> FastAPI:
     app.include_router(user_router)
     app.include_router(admin_router)
     app.include_router(rag_router)
+    app.include_router(vault_router)
 
     return app

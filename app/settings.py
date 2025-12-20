@@ -25,6 +25,7 @@ def feature_enabled(feature: str) -> bool:
         "mcp": True,
         "indexing": False,
         "rooms": True,
+        "vault": False,
     }
     env_map = {
         "terminal": "ENABLE_TERMINAL",
@@ -32,6 +33,7 @@ def feature_enabled(feature: str) -> bool:
         "mcp": "ENABLE_MCP",
         "indexing": "ENABLE_INDEXING",
         "rooms": "ENABLE_ROOMS",
+        "vault": "ENABLE_VAULT",
     }
     if feature not in env_map:
         return False
