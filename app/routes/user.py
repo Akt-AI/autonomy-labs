@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app.auth import require_user_from_request
+from app.mcp_policy import load_mcp_policy, save_mcp_policy
 from app.settings import feature_enabled
 from app.storage import user_data_dir
 
@@ -93,3 +94,24 @@ async def put_mcp_registry(body: McpRegistry, http_request: Request):
         return {"ok": True, "count": len(servers)}
     except Exception as e:
         raise HTTPException(status_code=500, detail={"code": "internal_error", "message": str(e)}) from e
+
+
+class McpPolicy(BaseModel):
+    version: int = 1
+    allow: list[str] = []
+    deny: list[str] = []
+
+
+@router.get("/api/user/mcp-policy")
+async def get_mcp_policy(http_request: Request):
+    user = await require_user_from_request(http_request)
+    user_id = str(user.get("id") or "")
+    return load_mcp_policy(user_id)
+
+
+@router.put("/api/user/mcp-policy")
+async def put_mcp_policy(body: McpPolicy, http_request: Request):
+    user = await require_user_from_request(http_request)
+    user_id = str(user.get("id") or "")
+    saved = save_mcp_policy(user_id, body.model_dump())
+    return {"ok": True, "policy": saved}

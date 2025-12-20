@@ -43,7 +43,9 @@ Legend:
 ## P2/P3 — MCP registry
 - [~] First-class MCP registry storage (per-user persistence via backend).
 - [~] Admin-managed MCP templates (server-side persisted).
-- [~] “Test connection”, “list tools”, tool allow/deny UI (SSRF-safe).
+- [~] “Test connection” (browser/CORS; SSRF-safe server proxy pending).
+- [x] “List tools” (via `/api/mcp/tools`).
+- [x] Tool allow/deny policy (UI + server-side enforcement).
 - [x] Import/export `mcp.json` via UI with validation.
 
 ## P3 — RAG + indexing (docs/web/GitHub) + “password manager”

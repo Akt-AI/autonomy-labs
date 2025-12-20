@@ -659,6 +659,8 @@ let supabase;
                 initProviderPresets();
                 // Best-effort: hydrate server-persisted MCP registry if local storage is empty.
                 maybeHydrateMcpRegistryFromServer();
+                writeMcpPolicyToInputs(loadMcpPolicyFromLocalStorage());
+                maybeHydrateMcpPolicyFromServer();
                 // Restore last chat mode (chat/autonomous)
                 const savedMode = localStorage.getItem('chat_mode_v1') || 'chat';
                 setChatMode(savedMode);
@@ -2144,6 +2146,7 @@ let supabase;
 
         // --- MCP Admin ---
         const MCP_STORAGE_KEY = 'mcp_servers_v1';
+        const MCP_POLICY_STORAGE_KEY = 'mcp_policy_v1';
 
         async function maybeHydrateMcpRegistryFromServer() {
             try {
@@ -2151,6 +2154,81 @@ let supabase;
                 if (raw && raw.trim() && raw.trim() !== '[]') return;
                 await loadMcpRegistryFromServer({ quiet: true });
             } catch { }
+        }
+
+        async function maybeHydrateMcpPolicyFromServer() {
+            try {
+                const raw = localStorage.getItem(MCP_POLICY_STORAGE_KEY);
+                if (raw && raw.trim() && raw.trim() !== '{}' && raw.trim() !== 'null') return;
+                await loadMcpPolicyFromServer({ quiet: true });
+            } catch { }
+        }
+
+        function setMcpPolicyStatus(text) {
+            const el = document.getElementById('mcp-policy-status');
+            if (el) el.textContent = text || '';
+        }
+
+        function readMcpPolicyFromInputs() {
+            const allowEl = document.getElementById('mcp-allow-tools');
+            const denyEl = document.getElementById('mcp-deny-tools');
+            const splitLines = (v) => (v || '').split('\n').map((s) => s.trim()).filter(Boolean);
+            const allow = splitLines(allowEl?.value || '');
+            const deny = splitLines(denyEl?.value || '');
+            return { version: 1, allow, deny };
+        }
+
+        function writeMcpPolicyToInputs(policy) {
+            const allowEl = document.getElementById('mcp-allow-tools');
+            const denyEl = document.getElementById('mcp-deny-tools');
+            const allow = Array.isArray(policy?.allow) ? policy.allow : [];
+            const deny = Array.isArray(policy?.deny) ? policy.deny : [];
+            if (allowEl) allowEl.value = allow.join('\n');
+            if (denyEl) denyEl.value = deny.join('\n');
+        }
+
+        function loadMcpPolicyFromLocalStorage() {
+            try {
+                return JSON.parse(localStorage.getItem(MCP_POLICY_STORAGE_KEY) || '{}');
+            } catch {
+                return {};
+            }
+        }
+
+        function saveMcpPolicyToLocalStorage(policy) {
+            localStorage.setItem(MCP_POLICY_STORAGE_KEY, JSON.stringify(policy || {}));
+        }
+
+        async function loadMcpPolicyFromServer({ quiet = false } = {}) {
+            try {
+                if (!quiet) setMcpPolicyStatus('Loading policy from server...');
+                const res = await authFetch('/api/user/mcp-policy');
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                saveMcpPolicyToLocalStorage(data);
+                writeMcpPolicyToInputs(data);
+                if (!quiet) setMcpPolicyStatus('Loaded policy from server.');
+            } catch (e) {
+                if (!quiet) setMcpPolicyStatus(`Failed to load policy: ${e?.message || e}`);
+            }
+        }
+
+        async function saveMcpPolicyToServer() {
+            try {
+                setMcpPolicyStatus('Saving policy to server...');
+                const policy = readMcpPolicyFromInputs();
+                const res = await authFetch('/api/user/mcp-policy', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(policy),
+                });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                saveMcpPolicyToLocalStorage(data?.policy || policy);
+                setMcpPolicyStatus('Saved policy to server.');
+            } catch (e) {
+                setMcpPolicyStatus(`Failed to save policy: ${e?.message || e}`);
+            }
         }
 
         async function loadMcpRegistryFromServer({ quiet = false } = {}) {

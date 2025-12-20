@@ -37,6 +37,7 @@ The Settings → MCP “Test” button runs from your browser, so it is subject 
 
 Also note:
 - `mcp.json` import only accepts `http://` / `https://` URLs.
+- If MCP tool calls are blocked, check Settings → MCP → Tool Policy (server-enforced allow/deny list).
 
 ## API errors are shown as JSON
 
