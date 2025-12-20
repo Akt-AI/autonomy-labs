@@ -1,32 +1,43 @@
 let supabase;
 
-        function parseHashParams() {
-            const raw = String(window.location.hash || '');
-            const s = raw.startsWith('#') ? raw.slice(1) : raw;
-            try {
-                return new URLSearchParams(s);
-            } catch {
-                return new URLSearchParams();
-            }
+        function parseUrlParams() {
+            const search = new URLSearchParams(String(window.location.search || ''));
+            const rawHash = String(window.location.hash || '');
+            const hash = rawHash.startsWith('#') ? rawHash.slice(1) : rawHash;
+            const hashParams = new URLSearchParams(hash);
+            return { search, hash: hashParams };
         }
 
-        async function consumeRecoverySessionFromUrl() {
-            if (!supabase) return false;
-            const params = parseHashParams();
-            const type = String(params.get('type') || '').trim().toLowerCase();
-            const access_token = String(params.get('access_token') || '').trim();
-            const refresh_token = String(params.get('refresh_token') || '').trim();
-            if (type !== 'recovery' || !access_token || !refresh_token) return false;
+        function isRecoveryUrl() {
+            const { search, hash } = parseUrlParams();
+            const type = String(hash.get('type') || search.get('type') || '').toLowerCase();
+            if (type === 'recovery') return true;
+            // Some links carry the tokens but omit `type`.
+            if (hash.get('access_token') || search.get('code')) return true;
+            return false;
+        }
+
+        async function consumeSessionFromUrl() {
+            if (!supabase) return { ok: false, isRecovery: false, error: null };
+            const isRecovery = isRecoveryUrl();
+            if (!isRecovery) return { ok: false, isRecovery: false, error: null };
 
             try {
-                const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-                if (error) throw error;
-                // Clean up the URL to avoid leaking tokens via screenshots/logs.
-                try { history.replaceState({}, '', '/login#type=recovery'); } catch { }
-                return true;
+                // Supabase links can be:
+                // - hash tokens: #access_token=...&refresh_token=...&type=recovery
+                // - PKCE code: ?code=...
+                // getSessionFromUrl handles both and stores the session when storeSession=true.
+                const { data, error } = await supabase.auth.getSessionFromUrl({ storeSession: true });
+                if (error) return { ok: false, isRecovery: true, error };
+                const hasSession = !!data?.session;
+                if (hasSession) {
+                    // Clean up URL to avoid leaking tokens via screenshots/logs/referrers.
+                    try { history.replaceState({}, '', '/login#type=recovery'); } catch { }
+                }
+                return { ok: hasSession, isRecovery: true, error: null };
             } catch (e) {
-                console.error('Failed to set recovery session', e);
-                return false;
+                console.error('Failed to consume session from URL', e);
+                return { ok: false, isRecovery: true, error: e };
             }
         }
 
@@ -46,10 +57,12 @@ let supabase;
                     registerBtn.style.display = 'none';
                 }
 
-                const recovered = await consumeRecoverySessionFromUrl();
+                const consumed = await consumeSessionFromUrl();
 
                 supabase.auth.onAuthStateChange((event, session) => {
                     if (event === 'PASSWORD_RECOVERY') {
+                        // Best-effort URL cleanup.
+                        try { history.replaceState({}, '', '/login#type=recovery'); } catch { }
                         showUpdatePanel();
                         return;
                     }
@@ -59,13 +72,19 @@ let supabase;
                     }
                 });
 
-                const recovery = recovered || isRecoveryUrl();
+                const recovery = consumed.isRecovery || isRecoveryUrl();
                 const { data: { session } } = await supabase.auth.getSession();
                 if (session && !recovery) {
                     window.location.href = '/app';
                     return;
                 }
                 if (recovery) {
+                    if (consumed.isRecovery && !consumed.ok && consumed.error) {
+                        showAlert(
+                            `Recovery link error: ${consumed.error?.message || String(consumed.error)}\n\n` +
+                            `Fix: ensure Supabase Auth → URL Configuration includes ${window.location.origin}/login.`,
+                        );
+                    }
                     showUpdatePanel();
                 } else {
                     showLoginPanel();
@@ -74,12 +93,6 @@ let supabase;
                 console.error('Error initializing Supabase:', error);
                 showAlert('Error initializing application configuration', 'error');
             }
-        }
-
-        function isRecoveryUrl() {
-            const hash = String(window.location.hash || '');
-            const search = String(window.location.search || '');
-            return hash.includes('type=recovery') || search.includes('type=recovery') || hash.includes('recovery');
         }
 
         function getPanels() {
@@ -214,8 +227,15 @@ let supabase;
                 return;
             }
             try {
-                // Some deployments require explicitly consuming tokens from the recovery URL.
-                await consumeRecoverySessionFromUrl();
+                await consumeSessionFromUrl();
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) {
+                    showAlert(
+                        'Missing recovery session.\n\n' +
+                        'Fix: open the password recovery email link again, and ensure Supabase Redirect URLs include /login.',
+                    );
+                    return;
+                }
                 const { error } = await supabase.auth.updateUser({ password: p1 });
                 if (error) throw error;
                 showAlert('Password updated. You can log in now.', 'success');

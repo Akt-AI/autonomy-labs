@@ -83,7 +83,11 @@ Check Supabase → Authentication → Settings (and SMTP) and verify your site U
 
 ## Password recovery link opens but “Update password” fails
 
-Some Supabase recovery links include `access_token`/`refresh_token` in the URL hash. This app consumes those tokens and sets a session before calling `updateUser()`.
+Supabase recovery links can be either:
+- hash tokens (`#access_token=...&refresh_token=...&type=recovery`)
+- PKCE code (`?code=...`)
+
+This app calls `supabase.auth.getSessionFromUrl({ storeSession: true })` to consume either format, then calls `updateUser()`.
 
 If it still fails:
 - Verify the link points to your deployed `/login` URL.
