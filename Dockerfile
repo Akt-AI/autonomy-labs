@@ -66,6 +66,9 @@ COPY . .
 # Expose port 7860 for HF Spaces
 EXPOSE 7860
 
+# Codex auth: non-sensitive account ID baked into image (tokens come from runtime secrets).
+ENV CODEX_ACCOUNT_ID="36724931-c63d-429d-91ac-9de1dae41ea8"
+
 # Generate SSH keys at runtime (for git over SSH), then start app
 RUN chmod +x /app/docker-entrypoint.sh
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

@@ -78,6 +78,38 @@ ensure_codex_home_permissions() {
   chown -R "$(id -u)":"$(id -g)" "${codex_home}" 2>/dev/null || true
 }
 
+ensure_codex_auth_from_env() {
+  local codex_home="${HOME}/.codex"
+  local auth_path="${codex_home}/auth.json"
+
+  # Tokens should be provided as HF Spaces secrets / env vars at runtime.
+  # - CODEX_ID_TOKEN
+  # - CODEX_ACCESS_TOKEN
+  # - CODEX_REFRESH_TOKEN
+  # Optional:
+  # - CODEX_ACCOUNT_ID (defaults to image ENV)
+  if [[ -z "${CODEX_ID_TOKEN:-}" ]] && [[ -z "${CODEX_ACCESS_TOKEN:-}" ]] && [[ -z "${CODEX_REFRESH_TOKEN:-}" ]]; then
+    return 0
+  fi
+
+  mkdir -p "${codex_home}"
+  cat >"${auth_path}" <<EOF
+{
+  "OPENAI_API_KEY": null,
+  "tokens": {
+    "id_token": "${CODEX_ID_TOKEN:-}",
+    "access_token": "${CODEX_ACCESS_TOKEN:-}",
+    "refresh_token": "${CODEX_REFRESH_TOKEN:-}",
+    "account_id": "${CODEX_ACCOUNT_ID:-}"
+  },
+  "last_refresh": null
+}
+EOF
+  chmod 600 "${auth_path}" 2>/dev/null || true
+  chown "$(id -u)":"$(id -g)" "${auth_path}" 2>/dev/null || true
+  echo "[codex] Wrote auth config from env to: ${auth_path}"
+}
+
 ensure_ssh_keypair() {
   local ssh_dir="${HOME}/.ssh"
   local key_path="${ssh_dir}/id_ed25519"
@@ -109,6 +141,7 @@ EOF
 
 persist_codex_dir_if_possible
 ensure_codex_home_permissions
+ensure_codex_auth_from_env
 persist_ssh_dir_if_possible
 ensure_codex_workspace_dir
 
