@@ -12,8 +12,7 @@ _ROOT = Path(__file__).resolve().parents[2]
 _STATIC = _ROOT / "static"
 
 
-@router.get("/config")
-async def get_config():
+def _config_payload() -> dict:
     return {
         "supabase_url": os.environ.get("SUPABASE_URL", "https://znhglkwefxdhgajvrqmb.supabase.co"),
         "supabase_key": os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_ANON_KEY"),
@@ -22,6 +21,15 @@ async def get_config():
         "default_model": os.environ.get("DEFAULT_MODEL", "gpt-3.5-turbo"),
     }
 
+
+@router.get("/config")
+async def get_config():
+    return _config_payload()
+
+
+@router.get("/api/config")
+async def get_api_config():
+    return _config_payload()
 
 @router.get("/")
 async def read_index():

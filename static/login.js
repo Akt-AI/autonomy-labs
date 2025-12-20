@@ -17,6 +17,33 @@ let supabase;
             return { search, hash: hashParams };
         }
 
+        function configEndpoint(path) {
+            const base = new URL('.', window.location.href);
+            const cleaned = String(path || '').replace(/^\/+/, '');
+            return new URL(cleaned, base).toString();
+        }
+
+        async function fetchConfig() {
+            const candidates = ['config', 'api/config'];
+            let lastError = null;
+            for (const path of candidates) {
+                try {
+                    const res = await fetch(configEndpoint(path));
+                    if (!res.ok) {
+                        if (res.status === 404) {
+                            lastError = new Error(`Config endpoint ${path} not found`);
+                            continue;
+                        }
+                        throw new Error(await res.text());
+                    }
+                    return await res.json();
+                } catch (e) {
+                    lastError = e;
+                }
+            }
+            throw lastError || new Error('Config fetch failed');
+        }
+
         function isRecoveryUrl() {
             const { search, hash } = parseUrlParams();
             const type = String(hash.get('type') || search.get('type') || '').toLowerCase();
@@ -52,8 +79,7 @@ let supabase;
 
         async function initSupabase() {
             try {
-                const res = await fetch('/config');
-                const config = await res.json();
+                const config = await fetchConfig();
                 if (!config.supabase_url || !config.supabase_key) {
                     throw new Error('Supabase configuration missing');
                 }
