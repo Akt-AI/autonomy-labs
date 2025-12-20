@@ -63,6 +63,46 @@ RUN uv pip install --system --no-cache -r requirements.txt
 # Copy application
 COPY . .
 
+# Bundle Supabase JS locally so Spaces can run without external CDNs.
+RUN node - <<'NODE'
+const fs = require('fs');
+const path = require('path');
+
+function walk(dir, out = []) {
+  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, ent.name);
+    if (ent.isDirectory()) walk(p, out);
+    else out.push(p);
+  }
+  return out;
+}
+
+const base = path.join(process.cwd(), 'node_modules', '@supabase', 'supabase-js');
+if (!fs.existsSync(base)) {
+  console.log('[build] @supabase/supabase-js not installed; skipping bundle copy');
+  process.exit(0);
+}
+
+const dist = path.join(base, 'dist');
+const files = fs.existsSync(dist) ? walk(dist) : walk(base);
+const candidates = files.filter((f) => /supabase(\.min)?\.js$/i.test(f)).sort();
+if (!candidates.length) {
+  console.log('[build] No supabase JS bundle found in package; skipping');
+  process.exit(0);
+}
+
+const src =
+  candidates.find((f) => /umd[\\/].*supabase\.min\.js$/i.test(f)) ||
+  candidates.find((f) => /umd[\\/].*supabase\.js$/i.test(f)) ||
+  candidates.find((f) => /supabase\.min\.js$/i.test(f)) ||
+  candidates[0];
+
+const dst = path.join(process.cwd(), 'static', 'vendor', 'supabase-js.min.js');
+fs.mkdirSync(path.dirname(dst), { recursive: true });
+fs.copyFileSync(src, dst);
+console.log(`[build] Copied ${src} -> ${dst}`);
+NODE
+
 # Expose port 7860 for HF Spaces
 EXPOSE 7860
 

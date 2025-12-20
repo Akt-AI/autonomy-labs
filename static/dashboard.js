@@ -325,10 +325,22 @@ let supabase;
             if (el) el.checked = !!enabled;
         }
 
-        function requireSupabaseLibrary() {
-            if (!window.supabase || typeof window.supabase.createClient !== 'function') {
-                throw new Error('Supabase client library failed to load. Check CDN access or content blockers.');
+        async function requireSupabaseLibrary() {
+            if (window.supabase && typeof window.supabase.createClient === 'function') return;
+            try {
+                const url = configEndpoint('static/vendor/supabase-js.min.js');
+                const res = await fetch(url, { method: 'GET' });
+                if (!res.ok) {
+                    throw new Error(`Supabase JS bundle missing (${res.status}) at ${url}`);
+                }
+                const text = await res.text();
+                if (text.trimStart().startsWith('<')) {
+                    throw new Error(`Supabase JS bundle URL returned HTML (likely 404 page): ${url}`);
+                }
+            } catch (e) {
+                throw new Error(e?.message || String(e));
             }
+            throw new Error('Supabase client library failed to load (bundle fetched but window.supabase is missing).');
         }
 
         function configEndpoint(path) {
@@ -1022,7 +1034,7 @@ let supabase;
             try {
                 const config = await fetchConfig();
                 if (!config.supabase_url || !config.supabase_key) throw new Error('Supabase Config Missing');
-                requireSupabaseLibrary();
+                await requireSupabaseLibrary();
                 supabase = window.__supabaseClient || window.supabase.createClient(config.supabase_url, config.supabase_key);
                 window.__supabaseClient = supabase;
 

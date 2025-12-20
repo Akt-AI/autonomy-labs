@@ -36,8 +36,15 @@ def _ensure_supabase_asset() -> None:
     target = _ROOT / "static" / "vendor" / "supabase-js.min.js"
     if target.exists():
         return
-    source = _ROOT / "node_modules" / "@supabase" / "supabase-js" / "dist" / "umd" / "supabase.min.js"
-    if not source.exists():
+    pkg = _ROOT / "node_modules" / "@supabase" / "supabase-js"
+    candidates = [
+        pkg / "dist" / "umd" / "supabase.min.js",
+        pkg / "dist" / "umd" / "supabase.js",
+        pkg / "dist" / "supabase.min.js",
+        pkg / "dist" / "supabase.js",
+    ]
+    source = next((p for p in candidates if p.exists()), None)
+    if not source:
         return
     target.parent.mkdir(parents=True, exist_ok=True)
     try:
