@@ -60,7 +60,7 @@
                 // Check if already logged in
                 const { data: { session } } = await supabase.auth.getSession();
                 if (session) {
-                    window.location.href = '/static/dashboard.html';
+                    window.location.href = '/app';
                 }
             } catch (error) {
                 console.error('Error initializing Supabase:', error);
@@ -103,12 +103,12 @@
                 if (type === 'register') {
                     if (result.data && result.data.session) {
                         // Email verification is disabled, user is logged in
-                        window.location.href = '/static/dashboard.html';
+                        window.location.href = '/app';
                     } else {
                         showAlert('Registration successful! Please check your email to verify (if enabled) or try logging in.', 'success');
                     }
                 } else {
-                    window.location.href = '/static/dashboard.html';
+                    window.location.href = '/app';
                 }
             } catch (error) {
                 showAlert(error.message);

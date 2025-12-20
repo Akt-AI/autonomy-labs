@@ -25,10 +25,19 @@ async def get_config():
 
 @router.get("/")
 async def read_index():
+    return FileResponse(str(_STATIC / "landing.html"))
+
+
+@router.get("/login")
+async def read_login():
     return FileResponse(str(_STATIC / "index.html"))
+
+
+@router.get("/app")
+async def read_app():
+    return FileResponse(str(_STATIC / "dashboard.html"))
 
 
 @router.get("/health")
 async def health_check():
     return {"status": "ok"}
-

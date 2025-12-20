@@ -1396,7 +1396,7 @@
                 supabase = window.supabase.createClient(config.supabase_url, config.supabase_key);
 
                 const { data: { session } } = await supabase.auth.getSession();
-                if (!session) { window.location.href = '/'; return; }
+                if (!session) { window.location.href = '/login'; return; }
                 window.__sbAccessToken = (session.access_token || '').trim();
                 supabase.auth.onAuthStateChange((_event, nextSession) => {
                     window.__sbAccessToken = (nextSession?.access_token || '').trim();
@@ -1463,7 +1463,7 @@
 
                 document.getElementById('logout-btn').addEventListener('click', async () => {
                     await supabase.auth.signOut();
-                    window.location.href = '/';
+                    window.location.href = '/login';
                 });
 
                 initProviderPresets();
