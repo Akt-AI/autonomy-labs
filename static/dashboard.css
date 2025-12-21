@@ -298,6 +298,24 @@
     border-radius: 16px !important;
 }
 
+[data-page="settings"] body,
+[data-page="admin"] body {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow: auto !important;
+}
+
+[data-page="settings"] body > .flex-grow,
+[data-page="admin"] body > .flex-grow {
+    overflow: visible !important;
+}
+
+[data-page="settings"] #settings-content,
+[data-page="admin"] #settings-content {
+    max-height: none !important;
+    overflow: visible !important;
+}
+
 .agent-toolbar {
     display: flex;
     align-items: center;

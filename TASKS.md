@@ -25,6 +25,7 @@ Legend:
 - [x] Split `static/dashboard.html` into JS/CSS files (`static/dashboard.js`, `static/dashboard.css`).
 - [x] Theme tokens shared across login + dashboard (single source of truth via `static/theme.css`).
 - [x] Separate Settings vs Admin pages (route-focused `/settings` and `/admin` views).
+- [x] Fix `/settings` and `/admin` scrolling in page-mode.
 
 ## P2 — Provider auth parity (Codex/Gemini/Claude)
 - [x] Codex auth file generation from env/secrets (`~/.codex/.auth.json` and `~/.codex/auth.json`).
