@@ -689,9 +689,19 @@
                                         class="flex-grow bg-gray-700 h-10 px-3 rounded-lg border border-gray-600 focus:ring-2 focus:ring-blue-500 focus:outline-none text-white"
                                         placeholder="Message..."
                                         onkeydown="handleEnter(event)" />
-                                    <input id="chat-model-quick" type="text" list="model-list" placeholder="Model"
-                                        class="bg-gray-700 h-10 w-44 px-2 rounded-lg border border-gray-600 text-sm text-white outline-none focus:border-blue-500 hidden sm:block"
-                                        onchange="setQuickModel(this.value)" title="Model" />
+                                    <div class="hidden sm:flex items-center gap-2">
+                                        <input id="chat-model-quick" type="text" list="model-list" placeholder="Model"
+                                            class="bg-gray-700 h-10 w-44 px-2 rounded-lg border border-gray-600 text-sm text-white outline-none focus:border-blue-500"
+                                            oninput="setQuickModel(this.value)" title="Model" />
+                                        <button onclick="fetchModels({ quiet: false }).catch(() => {})"
+                                            class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"
+                                            title="Refresh models" aria-label="Refresh models">
+                                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                    d="M20 12a8 8 0 1 1-2.343-5.657M20 4v6h-6" />
+                                            </svg>
+                                        </button>
+                                    </div>
                                     <datalist id="model-list"></datalist>
                                     <input id="chat-file-input" type="file" accept="image/*" multiple class="hidden" />
                                     <button onclick="document.getElementById('chat-file-input').click()"
@@ -719,18 +729,18 @@
                                         </svg>
                                     </button>
                                     <button id="chat-stop-btn" onclick="stopChatGeneration()" disabled
-                                        class="bg-gray-600 h-10 px-3 rounded-lg hover:bg-gray-700 font-bold transition inline-flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
+                                        class="bg-gray-600 h-10 w-10 rounded-lg hover:bg-gray-700 font-bold transition inline-flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed"
                                         title="Stop generating">
-                                        <svg class="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
-                                            <rect x="7" y="7" width="10" height="10" rx="2" />
+                                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                            <circle cx="12" cy="12" r="9" stroke-width="2" />
+                                            <rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor" stroke="none" />
                                         </svg>
-                                        Stop
                                     </button>
                                     <button onclick="sendChatBarMessage()"
                                         class="bg-blue-600 h-10 w-10 rounded-lg hover:bg-blue-700 font-bold transition inline-flex items-center justify-center">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                                                d="M10 14l11-11M21 3l-7 20-4-9-9-4 20-7z" />
                                         </svg>
                                     </button>
                                 </div>

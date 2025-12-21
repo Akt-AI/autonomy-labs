@@ -245,6 +245,70 @@ let supabase;
             else closeSettings();
         }
 
+        function getTerminalTheme() {
+            const isLight = (document.documentElement.getAttribute('data-theme') || 'dark') === 'light';
+            if (isLight) {
+                return {
+                    background: '#ffffff',
+                    foreground: '#0b1220',
+                    cursor: '#0b1220',
+                    cursorAccent: '#ffffff',
+                    selectionBackground: 'rgba(37, 99, 235, 0.22)',
+                    black: '#0b1220',
+                    red: '#b91c1c',
+                    green: '#15803d',
+                    yellow: '#a16207',
+                    blue: '#2563eb',
+                    magenta: '#7c3aed',
+                    cyan: '#0891b2',
+                    white: '#e5e7eb',
+                    brightBlack: '#334155',
+                    brightRed: '#dc2626',
+                    brightGreen: '#16a34a',
+                    brightYellow: '#ca8a04',
+                    brightBlue: '#1d4ed8',
+                    brightMagenta: '#6d28d9',
+                    brightCyan: '#0e7490',
+                    brightWhite: '#0b1220',
+                };
+            }
+            return {
+                background: "#300a24",
+                foreground: "#eeeeec",
+                cursor: "#eeeeec",
+                cursorAccent: "#300a24",
+                selectionBackground: "rgba(238, 238, 236, 0.25)",
+                black: "#2e3436",
+                red: "#cc0000",
+                green: "#4e9a06",
+                yellow: "#c4a000",
+                blue: "#3465a4",
+                magenta: "#75507b",
+                cyan: "#06989a",
+                white: "#d3d7cf",
+                brightBlack: "#555753",
+                brightRed: "#ef2929",
+                brightGreen: "#8ae234",
+                brightYellow: "#fce94f",
+                brightBlue: "#729fcf",
+                brightMagenta: "#ad7fa8",
+                brightCyan: "#34e2e2",
+                brightWhite: "#eeeeec"
+            };
+        }
+
+        function applyTerminalThemeToAll() {
+            const theme = getTerminalTheme();
+            Object.values(terminals).forEach((t) => {
+                try {
+                    if (!t?.term) return;
+                    if (typeof t.term.setOption === 'function') t.term.setOption('theme', theme);
+                    else t.term.options.theme = theme;
+                    t.term.refresh(0, t.term.rows - 1);
+                } catch { }
+            });
+        }
+
         function applyTheme(theme) {
             const t = theme === 'light' ? 'light' : 'dark';
             document.documentElement.setAttribute('data-theme', t);
@@ -262,6 +326,8 @@ let supabase;
             document.querySelectorAll('.chat-message').forEach((el) => {
                 el.classList.toggle('prose-invert', t !== 'light');
             });
+
+            applyTerminalThemeToAll();
         }
 
         function toggleTheme() {
@@ -1270,6 +1336,14 @@ let supabase;
                 // Chat bar quick controls
                 setChatAgentTarget(getChatAgentTarget());
                 syncQuickModelFromSettings();
+                const modelQuick = document.getElementById('chat-model-quick');
+                if (modelQuick) {
+                    modelQuick.addEventListener('focus', () => {
+                        const list = document.getElementById('model-list');
+                        const empty = !list || !list.children || list.children.length === 0;
+                        if (empty) fetchModels().catch(() => { });
+                    });
+                }
 
                 // Codex SDK settings UI
                 const codexSettings = getCodexSdkSettings();
@@ -1461,29 +1535,7 @@ let supabase;
                 copyOnSelect: true,
                 cursorBlink: true,
                 fontFamily: '"Ubuntu Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                theme: {
-                    background: "#300a24",
-                    foreground: "#eeeeec",
-                    cursor: "#eeeeec",
-                    cursorAccent: "#300a24",
-                    selectionBackground: "rgba(238, 238, 236, 0.25)",
-                    black: "#2e3436",
-                    red: "#cc0000",
-                    green: "#4e9a06",
-                    yellow: "#c4a000",
-                    blue: "#3465a4",
-                    magenta: "#75507b",
-                    cyan: "#06989a",
-                    white: "#d3d7cf",
-                    brightBlack: "#555753",
-                    brightRed: "#ef2929",
-                    brightGreen: "#8ae234",
-                    brightYellow: "#fce94f",
-                    brightBlue: "#729fcf",
-                    brightMagenta: "#ad7fa8",
-                    brightCyan: "#34e2e2",
-                    brightWhite: "#eeeeec"
-                }
+                theme: getTerminalTheme(),
             });
             const fitAddon = new FitAddon.FitAddon();
             term.loadAddon(fitAddon);
@@ -2351,9 +2403,9 @@ let supabase;
         function syncQuickModelFromSettings() {
             const next = getEffectiveChatModel();
             const quick = document.getElementById('chat-model-quick');
-            if (quick && !quick.value) quick.value = next;
+            if (quick && document.activeElement !== quick) quick.value = next;
             const agentQuick = document.getElementById('agent-model-quick');
-            if (agentQuick && !agentQuick.value) agentQuick.value = next;
+            if (agentQuick && document.activeElement !== agentQuick) agentQuick.value = next;
         }
 
         function getCodexThreadId() {
@@ -3297,9 +3349,9 @@ let supabase;
             if (!hasOverride && !hasDefault && ids[0]) {
                 localStorage.setItem('chat_model_override_v1', ids[0]);
                 const quick = document.getElementById('chat-model-quick');
-                if (quick && !quick.value) quick.value = ids[0];
+                if (quick && document.activeElement !== quick) quick.value = ids[0];
                 const agentQuick = document.getElementById('agent-model-quick');
-                if (agentQuick && !agentQuick.value) agentQuick.value = ids[0];
+                if (agentQuick && document.activeElement !== agentQuick) agentQuick.value = ids[0];
             }
 
             if (!quiet) alert(`Fetched ${ids.length} models.`);
