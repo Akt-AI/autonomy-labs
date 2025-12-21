@@ -106,7 +106,12 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     _ensure_supabase_asset()
-    app = FastAPI(lifespan=lifespan)
+    app = FastAPI(
+        lifespan=lifespan,
+        docs_url="/api/docs",
+        redoc_url="/api/redoc",
+        openapi_url="/api/openapi.json",
+    )
 
     @app.exception_handler(StarletteHTTPException)
     async def _http_exception_handler(_request, exc: StarletteHTTPException):

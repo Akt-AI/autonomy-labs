@@ -1,4 +1,5 @@
 let supabase;
+        let appConfig = {};
         // --- Multi-Terminal Logic ---
         let terminals = {}; // { id: { term, fitAddon, ws, containerId, scope } }
         let activeTerminalId = null; // scope: 'main'
@@ -467,6 +468,17 @@ let supabase;
                 }
             }
             throw lastError || new Error('Config fetch failed');
+        }
+
+        function updateChatEmptyHint() {
+            const el = document.getElementById('chat-empty-hint');
+            if (!el) return;
+            const baseUrl = (appConfig?.default_base_url || '').trim();
+            if (!baseUrl) {
+                el.innerHTML = 'Configure <code>DEFAULT_BASE_URL</code> in deployment secrets, then send a message.';
+                return;
+            }
+            el.textContent = 'Send a message to start.';
         }
 
         async function getAccessToken() {
@@ -1132,6 +1144,7 @@ let supabase;
         async function init() {
             try {
                 const config = await fetchConfig();
+                appConfig = config || {};
                 if (!config.supabase_url || !config.supabase_key) throw new Error('Supabase Config Missing');
                 await requireSupabaseLibrary();
                 supabase = window.__supabaseClient || window.supabase.createClient(config.supabase_url, config.supabase_key);
@@ -1148,6 +1161,7 @@ let supabase;
                 const savedTheme = localStorage.getItem('theme_v1');
                 if (savedTheme) applyTheme(savedTheme);
                 else applyTheme('dark');
+                updateChatEmptyHint();
 
                 // Admin/UI capabilities
                 const me = await loadMe();
@@ -1170,7 +1184,7 @@ let supabase;
                 if (localStorage.getItem('auth_allow_signup_v1') == null) {
                     localStorage.setItem('auth_allow_signup_v1', '1');
                 }
-                // Codex SDK defaults (separate from chat provider)
+                // Codex SDK defaults (separate from chat)
                 if (localStorage.getItem('codex_sdk_base_url_v1') == null) {
                     // Leave blank by default. For device-auth, Codex CLI uses its own auth flow
                     // and default endpoints; setting a base URL without an API key can cause 401s.
@@ -1361,26 +1375,8 @@ let supabase;
                     });
                 }
 
-                // Apply defaults if fields are empty
-                if (config.default_base_url && !document.getElementById('chat-base-url').value) {
-                    document.getElementById('chat-base-url').value = config.default_base_url;
-                }
-                if (config.default_api_key && !document.getElementById('chat-api-key').value) {
-                    document.getElementById('chat-api-key').value = config.default_api_key;
-                }
-                if (config.default_model && !document.getElementById('chat-model').value) {
-                    document.getElementById('chat-model').value = config.default_model;
-                }
-
-                // Populate model picker from the configured base URL
-                const baseUrlEl = document.getElementById('chat-base-url');
-                if (baseUrlEl) {
-                    baseUrlEl.addEventListener('change', () => fetchModels().catch(() => { }));
-                    baseUrlEl.addEventListener('blur', () => fetchModels().catch(() => { }));
-                }
+                syncQuickModelFromSettings();
                 fetchModels().catch(() => { });
-
-                loadProviders();
                 await initNotes();
                 await loadChatHistoryList();
                 createTerminalTab(); // Init first tab
@@ -2246,9 +2242,11 @@ let supabase;
             if (currentSessionId) await supabase.from('chat_messages').insert({ session_id: currentSessionId, role: 'user', content: message || (parts.length ? '[attachment]' : '') });
 
             // AI Request
-            const apiKey = document.getElementById('chat-api-key').value;
-            const baseUrl = document.getElementById('chat-base-url').value;
-            const model = document.getElementById('chat-model').value;
+            const provider = getProviderInputs();
+            if (!provider.baseUrl) {
+                alert('Chat provider is not configured. Set DEFAULT_BASE_URL (and DEFAULT_API_KEY) in deployment secrets.');
+                return;
+            }
             const aiMsgEl = addMessageToUI('assistant', '...');
             let aiContent = '';
 
@@ -2258,7 +2256,7 @@ let supabase;
                 const res = await fetch('/api/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ messages: chatHistory, apiKey, baseUrl, model }),
+                    body: JSON.stringify({ messages: chatHistory, apiKey: provider.apiKey, baseUrl: provider.baseUrl, model: provider.model }),
                     signal: chatAbortController.signal
                 });
 
@@ -2325,23 +2323,31 @@ let supabase;
             if (sel) sel.value = t;
         }
 
+        function getQuickModelOverride() {
+            return (localStorage.getItem('chat_model_override_v1') || '').trim();
+        }
+
+        function getEffectiveChatModel() {
+            return getQuickModelOverride() || (appConfig?.default_model || '').trim() || 'gpt-3.5-turbo';
+        }
+
         function setQuickModel(model) {
             const m = (model || '').trim();
-            if (!m) return;
-            const main = document.getElementById('chat-model');
-            if (main) main.value = m;
+            if (m) localStorage.setItem('chat_model_override_v1', m);
+            else localStorage.removeItem('chat_model_override_v1');
+            const next = getEffectiveChatModel();
             const quick = document.getElementById('chat-model-quick');
-            if (quick) quick.value = m;
+            if (quick) quick.value = next;
             const agentQuick = document.getElementById('agent-model-quick');
-            if (agentQuick) agentQuick.value = m;
+            if (agentQuick) agentQuick.value = next;
         }
 
         function syncQuickModelFromSettings() {
-            const main = document.getElementById('chat-model');
+            const next = getEffectiveChatModel();
             const quick = document.getElementById('chat-model-quick');
+            if (quick && !quick.value) quick.value = next;
             const agentQuick = document.getElementById('agent-model-quick');
-            if (main && quick) quick.value = main.value || '';
-            if (main && agentQuick) agentQuick.value = main.value || '';
+            if (agentQuick && !agentQuick.value) agentQuick.value = next;
         }
 
         function getCodexThreadId() {
@@ -2675,8 +2681,6 @@ let supabase;
             renderAgentAttachments();
             scrollAgentToBottom();
 
-            const model = document.getElementById('chat-model').value;
-
             const aiMsgEl = addAgentMessageToUI('assistant', '...');
             let aiContent = '';
             try {
@@ -2825,12 +2829,12 @@ let supabase;
                     renderMarkdownInto(aiMsgEl, aiContent || (progress.length ? progress.slice(-18).join('\n') : ''));
                     agentChatHistory.push({ role: 'assistant', content: aiContent || '' });
                 } else {
-                    const apiKey = document.getElementById('chat-api-key').value;
-                    const baseUrl = document.getElementById('chat-base-url').value;
+                    const provider = getProviderInputs();
+                    if (!provider.baseUrl) throw new Error('Chat provider is not configured (DEFAULT_BASE_URL).');
                     const res = await fetch('/api/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ messages: agentChatHistory, apiKey, baseUrl, model }),
+                        body: JSON.stringify({ messages: agentChatHistory, apiKey: provider.apiKey, baseUrl: provider.baseUrl, model: provider.model }),
                         signal: agentAbortController.signal
                     });
                     const reader = res.body.getReader();
@@ -3254,8 +3258,7 @@ let supabase;
 
         // --- Provider & Models ---
         async function fetchModels({ quiet = true } = {}) {
-            const apiKey = document.getElementById('chat-api-key')?.value || '';
-            const baseUrl = document.getElementById('chat-base-url')?.value || '';
+            const { apiKey, baseUrl } = getProviderInputs();
             if (!baseUrl) return;
 
             const res = await fetch('/api/proxy/models', {
@@ -3282,10 +3285,14 @@ let supabase;
                 list.appendChild(opt);
             });
 
-            const modelEl = document.getElementById('chat-model');
-            if (modelEl && !modelEl.value && ids[0]) {
-                modelEl.value = ids[0];
-                syncQuickModelFromSettings();
+            const hasOverride = !!getQuickModelOverride();
+            const hasDefault = !!(appConfig?.default_model || '').trim();
+            if (!hasOverride && !hasDefault && ids[0]) {
+                localStorage.setItem('chat_model_override_v1', ids[0]);
+                const quick = document.getElementById('chat-model-quick');
+                if (quick && !quick.value) quick.value = ids[0];
+                const agentQuick = document.getElementById('agent-model-quick');
+                if (agentQuick && !agentQuick.value) agentQuick.value = ids[0];
             }
 
             if (!quiet) alert(`Fetched ${ids.length} models.`);
@@ -4782,9 +4789,9 @@ let supabase;
 
         function getProviderInputs() {
             return {
-                apiKey: document.getElementById('chat-api-key')?.value || '',
-                baseUrl: document.getElementById('chat-base-url')?.value || '',
-                model: document.getElementById('chat-model')?.value || 'gpt-3.5-turbo',
+                apiKey: (appConfig?.default_api_key || '').trim(),
+                baseUrl: (appConfig?.default_base_url || '').trim(),
+                model: getEffectiveChatModel(),
             };
         }
 

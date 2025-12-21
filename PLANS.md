@@ -109,3 +109,4 @@ Note: see `docs/PASSWORD_MANAGER_SCOPE.md` for the current (non-vault) stance an
 - Open App and Login should point to login page.
 - Provider setting on path /app should be only on settings page.
 - Forget password not working. Fix.
+- Remove provider settings from dashboard UI (configure via `DEFAULT_*` secrets).

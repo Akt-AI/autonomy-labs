@@ -140,16 +140,16 @@
                         <h2 class="text-lg font-semibold text-gray-100">Getting started</h2>
                         <p class="text-sm text-gray-400 mt-1">A quick checklist to get productive in under a minute.</p>
                     </div>
-                    <button onclick="switchMode('chat'); openSettings();"
+                    <button onclick="window.location.href = routeUrl('settings');"
                         class="shrink-0 px-3 py-2 bg-gray-700 rounded-lg hover:bg-gray-600 text-sm font-medium transition">
-                        Provider Settings
+                        Settings
                     </button>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
                     <div class="p-3 rounded-xl bg-gray-900/40 border border-gray-700">
-                        <div class="text-sm font-semibold text-gray-200">1) Pick a provider</div>
-                        <div class="text-sm text-gray-400 mt-1">Open Chat → Settings → choose a preset, set Base URL + API key, fetch models.</div>
+                        <div class="text-sm font-semibold text-gray-200">1) Configure provider</div>
+                        <div class="text-sm text-gray-400 mt-1">Set <code>DEFAULT_BASE_URL</code> + <code>DEFAULT_API_KEY</code> in deployment secrets. Use the Model box in chat to override.</div>
                     </div>
                     <div class="p-3 rounded-xl bg-gray-900/40 border border-gray-700">
                         <div class="text-sm font-semibold text-gray-200">2) Start chatting</div>
@@ -225,55 +225,10 @@
                         <button onclick="closeSettings()" class="text-gray-400 hover:text-white px-2 py-1 rounded hover:bg-white/10">&times;</button>
                     </div>
                     <div id="settings-content" class="p-4 space-y-4 overflow-y-auto" style="max-height: calc(100% - 56px);">
-                        <div class="space-y-3">
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Saved Providers</label>
-                                <div class="flex gap-2">
-                                    <select id="saved-providers" onchange="loadSelectedProvider(this.value)"
-                                        class="flex-grow bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500">
-                                        <option value="">Select...</option>
-                                    </select>
-                                    <button onclick="saveProvider()"
-                                        class="bg-green-600 hover:bg-green-700 text-white px-2 rounded text-xs">Save</button>
-                                    <button onclick="deleteProvider()"
-                                        class="bg-red-600 hover:bg-red-700 text-white px-2 rounded text-xs">Del</button>
-                                </div>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Provider Preset</label>
-                                <div class="flex gap-2">
-                                    <select id="provider-presets" onchange="applyProviderPreset(this.value)"
-                                        class="flex-grow bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500">
-                                        <option value="">Select preset...</option>
-                                    </select>
-                                    <button onclick="applyProviderPreset(document.getElementById('provider-presets').value)"
-                                        class="bg-gray-600 hover:bg-gray-700 text-white px-2 rounded text-xs">Apply</button>
-                                </div>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">API Key</label>
-                                <input type="password" id="chat-api-key" placeholder="sk-..."
-                                    class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500">
-                                <div class="text-xs text-gray-500 mt-1">Stored per-user when you click Save.</div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Base URL</label>
-                                    <input type="text" id="chat-base-url" placeholder="https://api..."
-                                        class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-semibold text-gray-400 mb-1 uppercase">Model</label>
-                                    <div class="flex gap-1">
-                                        <input type="text" id="chat-model"
-                                            class="w-full bg-gray-700 text-sm rounded border border-gray-600 p-2 text-white outline-none focus:border-blue-500"
-                                            list="model-list">
-                                        <datalist id="model-list"></datalist>
-                                        <button onclick="fetchModels()"
-                                            class="bg-blue-600 hover:bg-blue-700 text-white px-2 rounded text-xs">↻</button>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="bg-gray-800/40 border border-gray-700 rounded-lg px-3 py-2">
+                            <div class="text-sm text-gray-100">Chat provider</div>
+                            <div class="text-xs text-gray-400 mt-0.5">Configured via deployment secrets (<code>DEFAULT_BASE_URL</code>, <code>DEFAULT_API_KEY</code>, <code>DEFAULT_MODEL</code>).</div>
+                            <div class="text-xs text-gray-500 mt-1">Use the Model input in the chat bar to override per-message.</div>
                         </div>
 
                         <div class="pt-4 border-t border-gray-700">
@@ -336,7 +291,7 @@
                                 </div>
                             </div>
                             <div class="text-xs text-gray-400 mb-2">
-                                Uses OpenAI Codex SDK locally (separate from your chat provider settings). Device auth is available in the terminal: <code>codex login --device-auth</code>.
+                                Uses OpenAI Codex SDK locally (separate from chat). Device auth is available in the terminal: <code>codex login --device-auth</code>.
                             </div>
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
@@ -723,7 +678,7 @@
                             <div id="chat-history" class="flex-grow p-4 overflow-y-auto space-y-4 scroll-smooth">
                                 <div id="chat-empty-state" class="text-center text-gray-500 mt-10">
                                     <div class="text-lg font-semibold text-gray-300">Start a conversation</div>
-                                    <div class="text-sm text-gray-500 mt-1">Pick a provider in Settings, then send a message.</div>
+                                    <div class="text-sm text-gray-500 mt-1" id="chat-empty-hint">Configure <code>DEFAULT_BASE_URL</code>, then send a message.</div>
                                 </div>
                             </div>
 
@@ -745,6 +700,7 @@
                                     <input id="chat-model-quick" type="text" list="model-list" placeholder="Model"
                                         class="bg-gray-700 h-10 w-44 px-2 rounded-lg border border-gray-600 text-sm text-white outline-none focus:border-blue-500 hidden sm:block"
                                         onchange="setQuickModel(this.value)" title="Model" />
+                                    <datalist id="model-list"></datalist>
                                     <input id="chat-file-input" type="file" accept="image/*" multiple class="hidden" />
                                     <button onclick="document.getElementById('chat-file-input').click()"
                                         class="bg-gray-700 h-10 w-10 rounded-lg hover:bg-gray-600 transition inline-flex items-center justify-center text-gray-200"

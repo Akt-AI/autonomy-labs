@@ -32,43 +32,118 @@
   </header>
 
   <main class="mx-auto max-w-4xl px-5 py-10">
-    <div class="prose prose-invert max-w-none">
-      <h1>Get started</h1>
-      <p>This app uses <strong>Supabase Auth</strong>. In Hugging Face Spaces, configure secrets first.</p>
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+      <aside class="md:col-span-1">
+        <div class="text-xs font-semibold text-gray-400 uppercase">Docs</div>
+        <div id="docs-nav" class="mt-2 space-y-1 text-sm"></div>
+        <div class="mt-6 text-xs font-semibold text-gray-400 uppercase">API</div>
+        <div class="mt-2 space-y-1 text-sm">
+          <a class="text-blue-300 hover:text-blue-200" href="/api/docs">API docs (Swagger)</a>
+          <a class="text-blue-300 hover:text-blue-200" href="/api/openapi.json">OpenAPI JSON</a>
+        </div>
+      </aside>
 
-      <h2>Hugging Face Spaces setup</h2>
-      <ol>
-        <li>Go to <strong>Settings → Variables and secrets → Secrets</strong>.</li>
-        <li>Set:
-          <ul>
-            <li><code>SUPABASE_URL</code></li>
-            <li><code>SUPABASE_KEY</code> (anon key) or <code>SUPABASE_ANON_KEY</code></li>
-          </ul>
-        </li>
-        <li>Restart the Space.</li>
-      </ol>
+      <article id="docs-content" class="md:col-span-3 prose prose-invert max-w-none">
+        <h1>Get started</h1>
+        <p>This app uses <strong>Supabase Auth</strong>. In Hugging Face Spaces, configure secrets first.</p>
 
-      <h2>Login / Register</h2>
-      <ul>
-        <li>Open <a href="/login">/login</a> and sign in.</li>
-        <li>To return to the app automatically, use <a href="/login?next=%2Fapp">/login?next=/app</a>.</li>
-      </ul>
+        <h2>Hugging Face Spaces setup</h2>
+        <ol>
+          <li>Go to <strong>Settings → Variables and secrets → Secrets</strong>.</li>
+          <li>Set:
+            <ul>
+              <li><code>SUPABASE_URL</code></li>
+              <li><code>SUPABASE_KEY</code> (anon key) or <code>SUPABASE_ANON_KEY</code></li>
+              <li><code>DEFAULT_BASE_URL</code> (OpenAI-compatible, e.g. <code>https://router.huggingface.co/v1</code>)</li>
+              <li><code>DEFAULT_API_KEY</code> (optional)</li>
+            </ul>
+          </li>
+          <li>Restart the Space.</li>
+        </ol>
 
-      <h2>Password reset</h2>
-      <ul>
-        <li>Ensure Supabase Auth redirect URLs include <code>/login</code> for your Space domain.</li>
-        <li>The login page supports both recovery link formats (<code>#access_token=…</code> and <code>?code=…</code>).</li>
-      </ul>
+        <h2>Login / Register</h2>
+        <ul>
+          <li>Open <a href="/login">/login</a> and sign in.</li>
+          <li>To return to the app automatically, use <a href="/login?next=%2Fapp">/login?next=/app</a>.</li>
+        </ul>
 
-      <h2>More docs</h2>
-      <ul>
-        <li><a href="https://github.com/Akt-AI/autonomy-labs/blob/main/README.md" target="_blank" rel="noreferrer">README</a></li>
-        <li><a href="https://github.com/Akt-AI/autonomy-labs/blob/main/docs/TROUBLESHOOTING.md" target="_blank" rel="noreferrer">Troubleshooting</a></li>
-        <li><a href="https://github.com/Akt-AI/autonomy-labs/blob/main/docs/SECURITY_DEPLOYMENT.md" target="_blank" rel="noreferrer">Security deployment</a></li>
-      </ul>
+        <h2>Password reset</h2>
+        <ul>
+          <li>Ensure Supabase Auth redirect URLs include <code>/login</code> for your Space domain.</li>
+          <li>The login page supports both recovery link formats (<code>#access_token=…</code> and <code>?code=…</code>).</li>
+        </ul>
+      </article>
     </div>
   </main>
+
+  <script>
+    const navEl = document.getElementById('docs-nav');
+    const contentEl = document.getElementById('docs-content');
+    let cachedStart = null;
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text == null ? '' : String(text);
+      return div.innerHTML;
+    }
+
+    function showStart() {
+      if (cachedStart != null) {
+        contentEl.innerHTML = cachedStart;
+      }
+    }
+
+    async function showDoc(slug) {
+      const res = await fetch(`/api/app-docs/${encodeURIComponent(slug)}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const title = data?.title || slug;
+      const markdown = data?.markdown || '';
+      contentEl.innerHTML = `
+        <h1>${escapeHtml(title)}</h1>
+        <p><a href="#" id="docs-back">← Back</a></p>
+        <pre class="whitespace-pre-wrap bg-black/30 border border-white/10 rounded-xl p-4 text-sm">${escapeHtml(markdown)}</pre>
+      `;
+      const back = document.getElementById('docs-back');
+      if (back) back.onclick = (e) => { e.preventDefault(); showStart(); };
+    }
+
+    async function loadNav() {
+      if (!navEl || !contentEl) return;
+      cachedStart = contentEl.innerHTML;
+      navEl.innerHTML = '<div class="text-gray-500 text-sm">Loading…</div>';
+      try {
+        const res = await fetch('/api/app-docs');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const pages = Array.isArray(data?.pages) ? data.pages : [];
+        if (!pages.length) {
+          navEl.innerHTML = '<div class="text-gray-500 text-sm">No docs found.</div>';
+          return;
+        }
+        navEl.innerHTML = '';
+        pages.forEach((p) => {
+          const a = document.createElement('a');
+          a.href = '#';
+          a.className = 'block px-2 py-1 rounded-lg hover:bg-white/5 text-gray-200';
+          a.textContent = p.title || p.slug;
+          a.onclick = async (e) => {
+            e.preventDefault();
+            try {
+              await showDoc(p.slug);
+            } catch (err) {
+              alert(`Failed to load doc: ${err?.message || err}`);
+            }
+          };
+          navEl.appendChild(a);
+        });
+      } catch (err) {
+        navEl.innerHTML = '<div class="text-red-300 text-sm">Failed to load docs API.</div>';
+      }
+    }
+
+    loadNav();
+  </script>
 </body>
 
 </html>
-

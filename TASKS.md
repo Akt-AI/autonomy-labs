@@ -22,6 +22,7 @@ Legend:
 ## P2 — UI/UX, settings, admin, landing
 - [x] Landing + route split (`/` landing, `/login`, `/app`) and UI redirects updated.
 - [x] Add `/docs` page and route `Get started` there.
+- [x] Publish docs + API docs endpoints (`/api/app-docs`, `/api/docs`).
 - [x] Split `static/dashboard.html` into JS/CSS files (`static/dashboard.js`, `static/dashboard.css`).
 - [x] Theme tokens shared across login + dashboard (single source of truth via `static/theme.css`).
 - [x] Separate Settings vs Admin pages (route-focused `/settings` and `/admin` views).
