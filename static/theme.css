@@ -89,6 +89,27 @@ footer {
   color: var(--accent-1);
 }
 
+[data-theme="light"] .bg-blue-600 {
+  background-color: var(--accent-1) !important;
+}
+[data-theme="light"] .hover\:bg-blue-700:hover {
+  background-color: #1d4ed8 !important;
+}
+[data-theme="light"] .bg-indigo-600,
+[data-theme="light"] .bg-purple-600 {
+  background-color: var(--accent-2) !important;
+}
+[data-theme="light"] .hover\:bg-indigo-700:hover,
+[data-theme="light"] .hover\:bg-purple-700:hover {
+  background-color: #6d28d9 !important;
+}
+
+[data-theme="light"] .text-blue-500,
+[data-theme="light"] .text-blue-400,
+[data-theme="light"] .text-blue-300 {
+  color: var(--accent-1) !important;
+}
+
 [data-theme="light"] input,
 [data-theme="light"] textarea,
 [data-theme="light"] select {

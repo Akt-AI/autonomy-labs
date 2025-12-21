@@ -257,6 +257,11 @@ let supabase;
             if (notesPreview) {
                 notesPreview.classList.toggle('prose-invert', t !== 'light');
             }
+
+            // Chat bubbles use prose-invert in dark mode only (light mode needs normal typography colors).
+            document.querySelectorAll('.chat-message').forEach((el) => {
+                el.classList.toggle('prose-invert', t !== 'light');
+            });
         }
 
         function toggleTheme() {
@@ -2291,7 +2296,8 @@ let supabase;
 
         function addMessageToUI(role, content) {
             const div = document.createElement('div');
-            div.className = `chat-message ${role === 'user' ? 'user-message self-end' : 'ai-message self-start'} max-w-[85%] p-3 rounded-xl my-2 prose prose-invert break-words text-sm md:text-base shadow-sm`;
+            const invert = (document.documentElement.getAttribute('data-theme') || 'dark') !== 'light';
+            div.className = `chat-message ${role === 'user' ? 'user-message self-end' : 'ai-message self-start'} max-w-[85%] p-3 rounded-xl my-2 prose ${invert ? 'prose-invert' : ''} break-words text-sm md:text-base shadow-sm`;
             renderMarkdownInto(div, content);
             const container = document.getElementById('chat-history');
             const empty = document.getElementById('chat-empty-state');
@@ -2874,7 +2880,8 @@ let supabase;
 
         function addAgentMessageToUI(role, content) {
             const div = document.createElement('div');
-            div.className = `chat-message ${role === 'user' ? 'user-message self-end' : 'ai-message self-start'} max-w-[85%] p-3 rounded-xl my-2 prose prose-invert break-words text-sm md:text-base shadow-sm`;
+            const invert = (document.documentElement.getAttribute('data-theme') || 'dark') !== 'light';
+            div.className = `chat-message ${role === 'user' ? 'user-message self-end' : 'ai-message self-start'} max-w-[85%] p-3 rounded-xl my-2 prose ${invert ? 'prose-invert' : ''} break-words text-sm md:text-base shadow-sm`;
             renderMarkdownInto(div, content);
             const container = document.getElementById('agent-chat-history');
             const empty = document.getElementById('agent-empty-state');
