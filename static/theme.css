@@ -5,10 +5,17 @@
   --panel-bg-2: #111827;
   --border: rgba(75, 85, 99, 0.7);
   --muted: rgba(203, 213, 225, 0.75);
+  --accent-1: #60a5fa;
+  --accent-2: #a78bfa;
 }
 
 [data-theme="light"] {
-  --app-bg: #f6f7fb;
+  --accent-1: #2563eb;
+  --accent-2: #7c3aed;
+  --app-bg:
+    radial-gradient(1100px 520px at 18% 0%, rgba(37, 99, 235, 0.12), transparent 60%),
+    radial-gradient(1100px 520px at 82% 0%, rgba(124, 58, 237, 0.10), transparent 60%),
+    #f7f8ff;
   --app-fg: #0b1220;
   --panel-bg: #ffffff;
   --panel-bg-2: #f3f5fa;
@@ -79,7 +86,7 @@ footer {
 
 [data-theme="light"] a,
 [data-theme="light"] .prose a {
-  color: #1d4ed8;
+  color: var(--accent-1);
 }
 
 [data-theme="light"] input,
